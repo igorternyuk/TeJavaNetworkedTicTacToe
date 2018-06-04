@@ -4,6 +4,7 @@ import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Graphics;
 import java.awt.GridLayout;
+import java.awt.Point;
 import java.awt.event.MouseEvent;
 import java.awt.event.MouseListener;
 import java.awt.image.BufferedImage;
@@ -43,6 +44,9 @@ public class Player {
         { " ", " ", " " }
     };
     private boolean isCircle = false;
+    private Point firstSpot = new Point(-1,-1);
+    private Point secondSpot = new Point(-1,-1);
+    private GameStatus gameStatus = GameStatus.PLAY;
     
     public Player(){
         this.window = new JFrame(TITLE_OF_PROGRAM);
@@ -68,6 +72,105 @@ public class Player {
         this.window.setResizable(false);
         this.window.setLocationRelativeTo(null);
         this.window.setVisible(true);
+    }
+    
+    private int countFreeSpots(){
+        int count = 0;
+        for(int i = 0; i < BOARD_SIZE; ++i){
+            for(int j = 0; j < BOARD_SIZE; ++j){
+                if(board[i][j].equals(" ")){
+                    ++count;
+                }
+            }
+        }
+        return count;
+    }
+    
+    private GameStatus checkGameStatus(){
+        GameStatus status = GameStatus.PLAY;
+        
+        //Check rows
+        outer:
+        for(int i = 0; i < board.length; ++i){
+            String first = board[i][0];
+            for(int j = 1; j < board[i].length; ++j){
+                if(!board[i][j].equalsIgnoreCase(first))
+                    continue outer;
+            }
+            status = first.equalsIgnoreCase("X")
+                    ? GameStatus.X_WON
+                    : GameStatus.O_WON;
+            firstSpot.x = SPOT_SIZE / 2;
+            firstSpot.y = i * (SPOT_SIZE + SPOT_GAP) + SPOT_SIZE / 2;
+            secondSpot.x = CANVAS_SIZE - SPOT_SIZE / 2;
+            secondSpot.y = firstSpot.y;
+            return status;
+        }
+        
+        //Check columns
+        outer:
+        for(int j = 0; j < BOARD_SIZE; ++j){
+            String first = board[0][j];
+            for(int i = 1; i < BOARD_SIZE; ++i){
+                if(!board[i][j].equalsIgnoreCase(first))
+                    continue outer;
+            }
+            status = first.equalsIgnoreCase("X")
+                    ? GameStatus.X_WON
+                    : GameStatus.O_WON;
+            firstSpot.x = j * (SPOT_SIZE + SPOT_GAP) + SPOT_SIZE / 2;
+            firstSpot.y = SPOT_SIZE / 2;
+            secondSpot.x = firstSpot.x;
+            secondSpot.y = CANVAS_SIZE - SPOT_SIZE / 2;
+            return status;
+        }
+        
+        
+        //Check main diagonal
+        boolean isMainDiagonalFilled = true;
+        for(int i = 1; i < BOARD_SIZE; ++i){
+            String first = board[0][0];
+            if(!board[i][i].equalsIgnoreCase(first)){
+                isMainDiagonalFilled = false;
+                break;
+            }
+        }
+        
+        if(isMainDiagonalFilled){
+            status = board[0][0].equalsIgnoreCase("X")
+                    ? GameStatus.X_WON
+                    : GameStatus.O_WON;
+            firstSpot.x = SPOT_SIZE / 2;
+            firstSpot.y = SPOT_SIZE / 2;
+            secondSpot.x = CANVAS_SIZE - SPOT_SIZE / 2;
+            secondSpot.y = CANVAS_SIZE - SPOT_SIZE / 2;
+            return status;
+        }
+        
+        //Check secondary diagonal
+        boolean isSecondaryDiagonalFilled = true;
+        for(int i = 1; i < BOARD_SIZE; ++i){
+            String first = board[0][BOARD_SIZE - 1];
+            if(!board[i][BOARD_SIZE - 1 - i].equalsIgnoreCase(first)){
+                isSecondaryDiagonalFilled = false;
+                break;
+            }
+        }
+        
+        if(isSecondaryDiagonalFilled){
+            status = board[0][BOARD_SIZE - 1].equalsIgnoreCase("X")
+                    ? GameStatus.X_WON
+                    : GameStatus.O_WON;
+            firstSpot.x = CANVAS_SIZE - SPOT_SIZE / 2;
+            firstSpot.y = SPOT_SIZE / 2;
+            secondSpot.x = SPOT_SIZE / 2;
+            secondSpot.y = CANVAS_SIZE - SPOT_SIZE / 2;
+            return status;
+        }
+        if(countFreeSpots() == 0)
+            return GameStatus.TIE;
+        
+        return status;
     }
     
     private class Canvas extends JPanel implements MouseListener{
