@@ -8,13 +8,17 @@ import java.awt.Point;
 import java.awt.event.MouseEvent;
 import java.awt.event.MouseListener;
 import java.awt.image.BufferedImage;
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
 import java.io.IOException;
+import java.net.Socket;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.imageio.ImageIO;
 import javax.swing.JButton;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
+import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JTextField;
 
@@ -47,6 +51,8 @@ public class Player {
     private Point firstSpot = new Point(-1,-1);
     private Point secondSpot = new Point(-1,-1);
     private GameStatus gameStatus = GameStatus.PLAY;
+    private boolean isYouTurn = false;
+    private ClientSideConnection clientSideConnection;
     
     public Player(){
         this.window = new JFrame(TITLE_OF_PROGRAM);
@@ -58,6 +64,80 @@ public class Player {
         setupGUI();
     }
     
+    public void connectToServer(String host, int port){
+        clientSideConnection = new ClientSideConnection(host, port);
+        if(isCircle){
+            Thread thread = new Thread(() -> {
+                System.out.println("Waiting for opponent...");
+                if(clientSideConnection.receiveOpponentReadiness()){
+                    isYouTurn = true;
+                }
+            });
+            thread.start();
+        }
+    }
+    
+    private class ClientSideConnection{
+        private Socket socket;
+        private DataInputStream dis;
+        private DataOutputStream dos;
+        
+        public ClientSideConnection(String host, int port){
+            try {
+                this.socket = new Socket(host, port);
+                this.dis = new DataInputStream(socket.getInputStream());
+                this.dos = new DataOutputStream(socket.getOutputStream());
+                isCircle = this.dis.readBoolean();
+                System.out.println("Connected to server as "
+                        + (isCircle ? " circle player" : " x player"));
+            } catch (IOException ex) {
+                Logger.getLogger(Player.class.getName()).log(Level.SEVERE,
+                        null, ex);
+            }
+        }
+        
+        public void sendMove(String move){
+            try {
+                this.dos.writeUTF(move);
+                this.dos.flush();
+            } catch (IOException ex) {
+                Logger.getLogger(Player.class.getName()).log(Level.SEVERE,
+                        null, ex);
+            }
+        }
+        
+        public String receiveMove(){
+            String move = "";
+            try {
+                move = this.dis.readUTF();
+            } catch (IOException ex) {
+                Logger.getLogger(Player.class.getName()).log(Level.SEVERE,
+                        null, ex);
+            }
+            return move;
+        }
+        
+        public boolean receiveOpponentReadiness(){
+            boolean isOpponentConnected = false;
+            try {
+                isOpponentConnected = this.dis.readBoolean();
+            } catch (IOException ex) {
+                Logger.getLogger(Player.class.getName()).log(Level.SEVERE,
+                        null, ex);
+            }
+            return isOpponentConnected;
+        }
+        
+        private void closeConnection(){
+            try {
+                this.socket.close();
+            } catch (IOException ex) {
+                Logger.getLogger(Player.class.getName()).log(Level.SEVERE,
+                        null, ex);
+            }
+        }
+    }
+    
     private void setupGUI(){
         this.window.setSize(WINDOW_WIDTH, WINDOW_HEIGHT);
         this.window.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
@@ -67,6 +147,25 @@ public class Player {
         this.connectionPanel.add(new JLabel("Port:"));
         this.connectionPanel.add(this.textFieldPort);
         this.connectionPanel.add(this.btnConnectToServer);
+        this.btnConnectToServer.addActionListener(e -> {
+            String host = this.textFieldHost.getText();
+            int port = 55555;
+            try{
+                port = Integer.parseInt(this.textFieldPort.getText());
+            } catch(NumberFormatException ex){
+                JOptionPane.showMessageDialog(this.window, ex.getMessage(),
+                        "Incorrect port", JOptionPane.WARNING_MESSAGE);
+                Logger.getLogger(getClass().getName()).log(Level.SEVERE,
+                        null, ex);
+            }
+            
+            if(port <= 1024 || port > 65535){
+                JOptionPane.showMessageDialog(this.window,
+                        "Port should be an integer between 1024 and 65535",
+                        "Incorrect port", JOptionPane.WARNING_MESSAGE);
+            }
+            connectToServer(host, port);
+        });
         this.window.add(BorderLayout.CENTER, this.canvas);
         this.window.add(BorderLayout.SOUTH, this.connectionPanel);
         this.window.setResizable(false);
@@ -237,9 +336,11 @@ public class Player {
 
         @Override
         public void mouseReleased(MouseEvent e) {
-            System.out.println("Mouse release event");
-            System.out.println("x = " + e.getX() / (SPOT_SIZE + SPOT_GAP)
-                             + " y = " + e.getY() / (SPOT_SIZE + SPOT_GAP));
+            if(isYouTurn){
+                int x = e.getX() / (SPOT_SIZE + SPOT_GAP);
+                int y = e.getY() / (SPOT_SIZE + SPOT_GAP);
+                
+            }
         }
 
         @Override
