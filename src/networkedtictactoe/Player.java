@@ -47,9 +47,9 @@ public class Player {
     private JTextField textFieldPort;
     private JButton btnConnectToServer;
     private String[][] board = {
-        { "X", "O", "X" },
-        { "O", "O", "O" },
-        { "X", " ", "X" }
+        { " ", " ", " " },
+        { " ", " ", " " },
+        { " ", " ", " " }
     };
     private boolean isCircle = true;
     private Point firstSpot = new Point(-1,-1);
@@ -66,80 +66,6 @@ public class Player {
         this.textFieldPort = new JTextField("55555");
         this.btnConnectToServer = new JButton("Connect");
         setupGUI();
-    }
-    
-    public void connectToServer(String host, int port){
-        clientSideConnection = new ClientSideConnection(host, port);
-        if(isCircle){
-            Thread thread = new Thread(() -> {
-                System.out.println("Waiting for opponent...");
-                if(clientSideConnection.receiveOpponentReadiness()){
-                    isYouTurn = true;
-                }
-            });
-            thread.start();
-        }
-    }
-    
-    private class ClientSideConnection{
-        private Socket socket;
-        private DataInputStream dis;
-        private DataOutputStream dos;
-        
-        public ClientSideConnection(String host, int port){
-            try {
-                this.socket = new Socket(host, port);
-                this.dis = new DataInputStream(socket.getInputStream());
-                this.dos = new DataOutputStream(socket.getOutputStream());
-                isCircle = this.dis.readBoolean();
-                System.out.println("Connected to server as "
-                        + (isCircle ? " circle player" : " x player"));
-            } catch (IOException ex) {
-                Logger.getLogger(Player.class.getName()).log(Level.SEVERE,
-                        null, ex);
-            }
-        }
-        
-        public void sendMove(String move){
-            try {
-                this.dos.writeUTF(move);
-                this.dos.flush();
-            } catch (IOException ex) {
-                Logger.getLogger(Player.class.getName()).log(Level.SEVERE,
-                        null, ex);
-            }
-        }
-        
-        public String receiveMove(){
-            String move = "";
-            try {
-                move = this.dis.readUTF();
-            } catch (IOException ex) {
-                Logger.getLogger(Player.class.getName()).log(Level.SEVERE,
-                        null, ex);
-            }
-            return move;
-        }
-        
-        public boolean receiveOpponentReadiness(){
-            boolean isOpponentConnected = false;
-            try {
-                isOpponentConnected = this.dis.readBoolean();
-            } catch (IOException ex) {
-                Logger.getLogger(Player.class.getName()).log(Level.SEVERE,
-                        null, ex);
-            }
-            return isOpponentConnected;
-        }
-        
-        private void closeConnection(){
-            try {
-                this.socket.close();
-            } catch (IOException ex) {
-                Logger.getLogger(Player.class.getName()).log(Level.SEVERE,
-                        null, ex);
-            }
-        }
     }
     
     private void setupGUI(){
@@ -177,98 +103,124 @@ public class Player {
         this.window.setVisible(true);
     }
     
-    private int countFreeSpots(){
-        int count = 0;
-        for(int i = 0; i < BOARD_SIZE; ++i){
-            for(int j = 0; j < BOARD_SIZE; ++j){
-                if(board[i][j].equals(" ")){
-                    ++count;
+    public void connectToServer(String host, int port){
+        clientSideConnection = new ClientSideConnection(host, port);
+        if(isCircle){
+            Thread thread = new Thread(() -> {
+                System.out.println("Waiting for opponent...");
+                if(clientSideConnection.receiveOpponentReadiness()){
+                    gameStatus = GameStatus.O_TO_PLAY;
                 }
-            }
+            });
+            thread.start();
+        } else {
+            gameStatus = GameStatus.O_TO_PLAY;
         }
-        return count;
     }
     
-    private void checkGameStatus(){
-        //Check rows
-        outer:
-        for(int i = 0; i < board.length; ++i){
-            String first = board[i][0];
-            for(int j = 1; j < board[i].length; ++j){
-                if(!board[i][j].equalsIgnoreCase(first))
-                    continue outer;
-            }
-            gameStatus = first.equalsIgnoreCase("X")
-                    ? GameStatus.X_WON
-                    : GameStatus.O_WON;
-            firstSpot.x = SPOT_SIZE / 2;
-            firstSpot.y = i * (SPOT_SIZE + SPOT_GAP) + SPOT_SIZE / 2;
-            secondSpot.x = CANVAS_SIZE - SPOT_SIZE / 2;
-            secondSpot.y = firstSpot.y;
-            return;
-        }
+    private class ClientSideConnection{
+        private Socket socket;
+        private DataInputStream dis;
+        private DataOutputStream dos;
         
-        //Check columns
-        outer:
-        for(int j = 0; j < BOARD_SIZE; ++j){
-            String first = board[0][j];
-            for(int i = 1; i < BOARD_SIZE; ++i){
-                if(!board[i][j].equalsIgnoreCase(first))
-                    continue outer;
-            }
-            gameStatus = first.equalsIgnoreCase("X")
-                    ? GameStatus.X_WON
-                    : GameStatus.O_WON;
-            firstSpot.x = j * (SPOT_SIZE + SPOT_GAP) + SPOT_SIZE / 2;
-            firstSpot.y = SPOT_SIZE / 2;
-            secondSpot.x = firstSpot.x;
-            secondSpot.y = CANVAS_SIZE - SPOT_SIZE / 2;
-            return;
-        }
-        
-        //Check main diagonal
-        boolean isMainDiagonalFilled = true;
-        for(int i = 1; i < BOARD_SIZE; ++i){
-            String first = board[0][0];
-            if(!board[i][i].equalsIgnoreCase(first)){
-                isMainDiagonalFilled = false;
-                break;
+        public ClientSideConnection(String host, int port){
+            try {
+                this.socket = new Socket(host, port);
+                this.dis = new DataInputStream(socket.getInputStream());
+                this.dos = new DataOutputStream(socket.getOutputStream());
+                isCircle = this.dis.readBoolean();
+                System.out.println("Connected to server as "
+                        + (isCircle ? " circle player" : " x player"));
+            } catch (IOException ex) {
+                Logger.getLogger(Player.class.getName()).log(Level.SEVERE,
+                        null, ex);
             }
         }
         
-        if(isMainDiagonalFilled){
-            gameStatus = board[0][0].equalsIgnoreCase("X")
-                    ? GameStatus.X_WON
-                    : GameStatus.O_WON;
-            firstSpot.x = SPOT_SIZE / 2;
-            firstSpot.y = SPOT_SIZE / 2;
-            secondSpot.x = CANVAS_SIZE - SPOT_SIZE / 2;
-            secondSpot.y = CANVAS_SIZE - SPOT_SIZE / 2;
-            return;
-        }
-        
-        //Check secondary diagonal
-        boolean isSecondaryDiagonalFilled = true;
-        for(int i = 1; i < BOARD_SIZE; ++i){
-            String first = board[0][BOARD_SIZE - 1];
-            if(!board[i][BOARD_SIZE - 1 - i].equalsIgnoreCase(first)){
-                isSecondaryDiagonalFilled = false;
-                break;
+        public void sendMove(int move){
+            try {
+                this.dos.writeInt(move);
+                this.dos.flush();
+            } catch (IOException ex) {
+                Logger.getLogger(Player.class.getName()).log(Level.SEVERE,
+                        null, ex);
             }
         }
         
-        if(isSecondaryDiagonalFilled){
-            gameStatus = board[0][BOARD_SIZE - 1].equalsIgnoreCase("X")
-                    ? GameStatus.X_WON
-                    : GameStatus.O_WON;
-            firstSpot.x = CANVAS_SIZE - SPOT_SIZE / 2;
-            firstSpot.y = SPOT_SIZE / 2;
-            secondSpot.x = SPOT_SIZE / 2;
-            secondSpot.y = CANVAS_SIZE - SPOT_SIZE / 2;
-            return;
+        public int receiveMove(){
+            int move = -1;
+            try {
+                move = this.dis.readInt();
+            } catch (IOException ex) {
+                Logger.getLogger(Player.class.getName()).log(Level.SEVERE,
+                        null, ex);
+            }
+            return move;
         }
-        if(countFreeSpots() == 0)
-            gameStatus = GameStatus.TIE;
+        
+        public boolean receiveOpponentReadiness(){
+            boolean isOpponentConnected = false;
+            try {
+                isOpponentConnected = this.dis.readBoolean();
+            } catch (IOException ex) {
+                Logger.getLogger(Player.class.getName()).log(Level.SEVERE,
+                        null, ex);
+            }
+            return isOpponentConnected;
+        }
+        
+        public GameStatus receiveGameStatus(){
+            int index = 0;
+            try {
+                index = this.dis.readInt();
+            } catch (IOException ex) {
+                Logger.getLogger(Player.class.getName()).log(Level.SEVERE,
+                        null, ex);
+            }
+            return GameStatus.values()[index];
+        }
+        
+        private void closeConnection(){
+            try {
+                this.socket.close();
+            } catch (IOException ex) {
+                Logger.getLogger(Player.class.getName()).log(Level.SEVERE,
+                        null, ex);
+            }
+        }
+    }
+    
+    public void makeMove(int move){
+        int y = move / BOARD_SIZE;
+        int x = move % BOARD_SIZE;
+        this.board[y][x] = isCircle ? "O" : "X";
+    }
+    
+    public void startWaitingForOpponentMove(){
+        
+    }
+    
+    public void updateTurn(){
+        /*
+        int btnNum = clientSideConnection.receiveButtonNumber();
+        messagesArea.setText("Your opponent clicked button #" + btnNum
+                + ". Your turn.");
+        opponentPoints += this.values[btnNum - 1];
+        System.out.println("---Updating turn---");
+        System.out.println("You are player #" + id);
+        System.out.println("Turns made - " + turnsMade);
+        if(id == 1 && turnsMade == maxTurns){
+            System.out.println("Determining the winner for the first player");
+            determineWinner();
+        } else {
+            buttonsEnabled = true;
+        }
+        toggleButtons();
+        System.out.println("You enemy has " + opponentPoints + ".");
+        */
+    }
+    
+    public void calculatePoints(){
     }
     
     private class Canvas extends JPanel implements MouseListener{
@@ -294,7 +246,6 @@ public class Player {
             setBackground(Color.white);
             addMouseListener(this);
             loadImages();
-            checkGameStatus();
         }
         
         private void loadImages(){
@@ -395,10 +346,13 @@ public class Player {
 
         @Override
         public void mouseReleased(MouseEvent e) {
-            if(isYouTurn){
+            if((isCircle && gameStatus == GameStatus.O_TO_PLAY)
+               || (!isCircle && gameStatus == GameStatus.X_TO_PLAY)){
                 int x = e.getX() / (SPOT_SIZE + SPOT_GAP);
                 int y = e.getY() / (SPOT_SIZE + SPOT_GAP);
-                
+                int move = y * BOARD_SIZE + x;
+                makeMove(move);
+                clientSideConnection.sendMove(move); 
             }
         }
 
