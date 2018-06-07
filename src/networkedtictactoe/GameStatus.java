@@ -40,6 +40,12 @@ public enum GameStatus {
         public boolean isGameOver() {
             return true;
         }
+    },
+    OPPONENT_DISCONNECTED {
+        @Override
+        public boolean isGameOver() {
+            return true;
+        }
     };
     
     public abstract boolean isGameOver();

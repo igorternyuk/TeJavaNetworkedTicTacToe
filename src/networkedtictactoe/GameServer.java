@@ -18,7 +18,8 @@ public class GameServer {
     private int port;
     private ServerSocket serverSocket;
     private int numPlayers = 0;
-    private ServerSideConnection playerO, playerX;
+    private ServerSideConnection playerO;
+    private ServerSideConnection playerX;
     private String[][] board = {
         { " ", " ", " " },
         { " ", " ", " " },
@@ -50,14 +51,17 @@ public class GameServer {
                 if(numPlayers == 1){
                     playerO = ssc;
                     gameStatus = GameStatus.WAINTING_FOR_OPPONENT;
-                } else {
+                } else if(numPlayers == 2) {
                     playerX = ssc;
                     playerO.sendSecondPlayerReadiness();
                     gameStatus = GameStatus.O_TO_PLAY;
                     System.out.println("Opponent connected");
+                    playerO.sendGameStatus(gameStatus);
+                    playerX.sendGameStatus(gameStatus);
+
                 }
                 Thread thread = new Thread(ssc);
-                    thread.start();
+                thread.start();
             }
             System.out.println("Two players connected.No longer accepting "
                     + "connections.");
@@ -65,6 +69,15 @@ public class GameServer {
         catch(IOException ex){
             Logger.getLogger(GameServer.class.getName()).log(Level.SEVERE,
                     null, ex);    
+        }
+    }
+    
+    public void printBoard(){
+        for(int i = 0; i < board.length; ++i){
+            for(int j = 0; j < board[i].length; ++j){
+                System.out.print(board[i][j] + "-");
+            }
+            System.out.println("");
         }
     }
     
@@ -81,17 +94,21 @@ public class GameServer {
     }
     
     private void checkGameStatus(){
+        System.out.println("Checking game status");
         //Check rows
         outer:
         for(int i = 0; i < board.length; ++i){
             String first = board[i][0];
+            if(first.isEmpty()) continue;
             for(int j = 1; j < board[i].length; ++j){
                 if(!board[i][j].equalsIgnoreCase(first))
                     continue outer;
             }
-            gameStatus = first.equalsIgnoreCase("X")
-                    ? GameStatus.X_WON
-                    : GameStatus.O_WON;
+            if(first.equalsIgnoreCase("X")){
+                gameStatus = GameStatus.X_WON;
+            } else if(first.equalsIgnoreCase("O")){
+                gameStatus = GameStatus.O_WON;
+            }
             /*firstSpot.x = SPOT_SIZE / 2;
             firstSpot.y = i * (SPOT_SIZE + SPOT_GAP) + SPOT_SIZE / 2;
             secondSpot.x = CANVAS_SIZE - SPOT_SIZE / 2;
@@ -103,13 +120,16 @@ public class GameServer {
         outer:
         for(int j = 0; j < BOARD_SIZE; ++j){
             String first = board[0][j];
+            if(first.isEmpty()) continue;
             for(int i = 1; i < BOARD_SIZE; ++i){
                 if(!board[i][j].equalsIgnoreCase(first))
                     continue outer;
             }
-            gameStatus = first.equalsIgnoreCase("X")
-                    ? GameStatus.X_WON
-                    : GameStatus.O_WON;
+            if(first.equalsIgnoreCase("X")){
+                gameStatus = GameStatus.X_WON;
+            } else if(first.equalsIgnoreCase("O")){
+                gameStatus = GameStatus.O_WON;
+            }
             /*firstSpot.x = j * (SPOT_SIZE + SPOT_GAP) + SPOT_SIZE / 2;
             firstSpot.y = SPOT_SIZE / 2;
             secondSpot.x = firstSpot.x;
@@ -118,19 +138,26 @@ public class GameServer {
         }
         
         //Check main diagonal
+        String first = board[0][0];
         boolean isMainDiagonalFilled = true;
-        for(int i = 1; i < BOARD_SIZE; ++i){
-            String first = board[0][0];
-            if(!board[i][i].equalsIgnoreCase(first)){
-                isMainDiagonalFilled = false;
-                break;
+        if(first.isEmpty()){
+            isMainDiagonalFilled = false;
+        } else {
+            for(int i = 1; i < BOARD_SIZE; ++i){
+                first = board[0][0];
+                if(!board[i][i].equalsIgnoreCase(first)){
+                    isMainDiagonalFilled = false;
+                    break;
+                }
             }
         }
         
         if(isMainDiagonalFilled){
-            gameStatus = board[0][0].equalsIgnoreCase("X")
-                    ? GameStatus.X_WON
-                    : GameStatus.O_WON;
+            if(first.equalsIgnoreCase("X")){
+                gameStatus = GameStatus.X_WON;
+            } else if(first.equalsIgnoreCase("O")){
+                gameStatus = GameStatus.O_WON;
+            }
             /*firstSpot.x = SPOT_SIZE / 2;
             firstSpot.y = SPOT_SIZE / 2;
             secondSpot.x = CANVAS_SIZE - SPOT_SIZE / 2;
@@ -140,18 +167,24 @@ public class GameServer {
         
         //Check secondary diagonal
         boolean isSecondaryDiagonalFilled = true;
-        for(int i = 1; i < BOARD_SIZE; ++i){
-            String first = board[0][BOARD_SIZE - 1];
-            if(!board[i][BOARD_SIZE - 1 - i].equalsIgnoreCase(first)){
-                isSecondaryDiagonalFilled = false;
-                break;
+        first = board[0][BOARD_SIZE - 1];
+        if(first.isEmpty()){
+            isSecondaryDiagonalFilled = false;
+        } else {
+            for(int i = 1; i < BOARD_SIZE; ++i){
+                if(!board[i][BOARD_SIZE - 1 - i].equalsIgnoreCase(first)){
+                    isSecondaryDiagonalFilled = false;
+                    break;
+                }
             }
         }
         
         if(isSecondaryDiagonalFilled){
-            gameStatus = board[0][BOARD_SIZE - 1].equalsIgnoreCase("X")
-                    ? GameStatus.X_WON
-                    : GameStatus.O_WON;
+            if(first.equalsIgnoreCase("X")){
+                gameStatus = GameStatus.X_WON;
+            } else if(first.equalsIgnoreCase("O")){
+                gameStatus = GameStatus.O_WON;
+            }
             /*firstSpot.x = CANVAS_SIZE - SPOT_SIZE / 2;
             firstSpot.y = SPOT_SIZE / 2;
             secondSpot.x = SPOT_SIZE / 2;
@@ -171,9 +204,11 @@ public class GameServer {
         
         public ServerSideConnection(Socket socket, int playerID){
             try {
+                System.out.println("--Server side connection for player #"
+                        + playerID + "---");
                 this.socket = socket;
                 this.playerId = playerID;
-                this.isCircle = playerID == 1;
+                this.isCircle = (playerID == 1);
                 this.dis = new DataInputStream(this.socket.getInputStream());
                 this.dos = new DataOutputStream(this.socket.getOutputStream());
             } catch (IOException ex) {
@@ -185,7 +220,10 @@ public class GameServer {
         @Override
         public void run() {
             try {
+                this.dos.writeInt(0);
                 this.dos.writeBoolean(this.isCircle);
+                this.dos.flush();
+                System.out.println("Sending is circle from server " + isCircle);
             } catch (IOException ex) {
                 Logger.getLogger(GameServer.class.getName()).log(Level.SEVERE,
                         null, ex);
@@ -193,29 +231,14 @@ public class GameServer {
             
             while(true){
                 checkGameStatus();
+                //System.out.println("gameStatus + " + gameStatus);
                 if(gameStatus.isGameOver()){
                     System.out.println("---GAME OVER---");
                     break;
-                }
-                
+                }                
                 try{
-                    if(this.isCircle){
-                        movePlayerO = this.dis.readInt();
-                        int y = movePlayerO / BOARD_SIZE;
-                        int x = movePlayerO % BOARD_SIZE;
-                        board[y][x] = "O";
-                        playerX.sendMove(movePlayerO);
-                    } else {
-                        movePlayerX = this.dis.readInt();
-                        int y = movePlayerX / BOARD_SIZE;
-                        int x = movePlayerX % BOARD_SIZE;
-                        board[y][x] = "X";
-                        playerO.sendMove(movePlayerX);
-                        
-                    }
-                    checkGameStatus();
-                    playerO.sendGameStatus(gameStatus);
-                    playerX.sendGameStatus(gameStatus);
+                    receiveMessage();
+                    //TODO if game over send first and second spot coordinates
                 } catch(IOException ex){
                     
                 }
@@ -223,9 +246,70 @@ public class GameServer {
             closeConnection();
         }
         
+        public void receiveMessage() throws IOException{
+            try {
+                int code = this.dis.readInt();
+                switch(code){
+                    case 2:
+                        System.out.println("Server side connection for player #"
+                            + playerId);
+                        if(this.isCircle){
+                            movePlayerO = this.dis.readInt();
+                            System.out.println("received movePlayerO = " + movePlayerO);
+                            int y = movePlayerO / BOARD_SIZE;
+                            int x = movePlayerO % BOARD_SIZE;
+                            System.out.println("x = " + x + " y = " + y);
+                            board[y][x] = "O";
+                            printBoard();
+                            playerX.sendMove(movePlayerO);
+                        } else {
+                            movePlayerX = this.dis.readInt();
+                            System.out.println("received movePlayerX = " + movePlayerX);
+                            int y = movePlayerX / BOARD_SIZE;
+                            int x = movePlayerX % BOARD_SIZE;
+                            System.out.println("x = " + x + " y = " + y);
+                            board[y][x] = "X";
+                            printBoard();
+                            playerO.sendMove(movePlayerX);
+                        }
+                        checkGameStatus();
+                        if(!gameStatus.isGameOver()){
+                            if(gameStatus == GameStatus.X_TO_PLAY){
+                                System.out.println("Changing turn to O");
+                                gameStatus = GameStatus.O_TO_PLAY;
+                            } else if(gameStatus == GameStatus.O_TO_PLAY){
+                                gameStatus = GameStatus.X_TO_PLAY;
+                                System.out.println("Changing turn to X");
+                            }
+                        }
+                        playerO.sendGameStatus(gameStatus);
+                        playerX.sendGameStatus(gameStatus);
+                        break;
+                    case 5:
+                        if(this.dis.readBoolean()){
+                            gameStatus = GameStatus.OPPONENT_DISCONNECTED;
+                            if(isCircle){
+                                playerX.sendGameStatus(gameStatus);
+                            } else {
+                                playerO.sendGameStatus(gameStatus);
+                            }
+                        }
+                        break;
+                }
+            } catch (IOException ex) {
+                Logger.getLogger(GameServer.class.getName()).log(Level.SEVERE,
+                        null, ex);
+                throw ex;
+            }
+        }
+        
         public void sendMove(int move){
             try {
-                this.dos.write(move);
+                System.out.println("Sending move from server " + move);
+                int code = 2;
+                this.dos.writeInt(code);
+                System.out.println("Writing move " + move);
+                this.dos.writeInt(move);
                 this.dos.flush();
             } catch (IOException ex) {
                 Logger.getLogger(GameServer.class.getName()).log(Level.SEVERE,
@@ -234,7 +318,11 @@ public class GameServer {
         }
         
         public void sendGameStatus(GameStatus status){
+            System.out.println("Sending game status " + status);
             try {
+                System.out.println("status.ordinal() = " + status.ordinal());
+                int code = 3;
+                this.dos.writeInt(code);
                 this.dos.writeInt(status.ordinal());
                 this.dos.flush();
             } catch (IOException ex) {
@@ -245,6 +333,7 @@ public class GameServer {
         
         public void sendSecondPlayerReadiness(){
             try {
+                this.dos.writeInt(1);
                 this.dos.writeBoolean(true);
                 this.dos.flush();
             } catch (IOException ex) {
