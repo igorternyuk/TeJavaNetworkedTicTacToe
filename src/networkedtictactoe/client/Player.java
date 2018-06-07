@@ -1,4 +1,4 @@
-package networkedtictactoe;
+package networkedtictactoe.client;
 
 import java.awt.BasicStroke;
 import java.awt.BorderLayout;
@@ -27,6 +27,8 @@ import javax.swing.JLabel;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JTextField;
+import networkedtictactoe.GameStatus;
+import networkedtictactoe.MessageType;
 
 /**
  *
@@ -40,11 +42,12 @@ public class Player {
     private static final int CANVAS_SIZE = (SPOT_SIZE + SPOT_GAP) * BOARD_SIZE;
     private static final int CONNECTION_PANEL_HEIGHT = 40;
     private static final int WINDOW_WIDTH = CANVAS_SIZE - 7;
-    private static final int WINDOW_HEIGHT = CANVAS_SIZE + CONNECTION_PANEL_HEIGHT;
+    private static final int WINDOW_HEIGHT = CANVAS_SIZE + CONNECTION_PANEL_HEIGHT + 15;
     
     private JFrame window;
     private Canvas canvas;
     private JPanel connectionPanel;
+    private JLabel lblGameStatus;
     private JTextField textFieldHost;
     private JTextField textFieldPort;
     private JButton btnConnectToServer;
@@ -67,6 +70,7 @@ public class Player {
         this.textFieldHost = new JTextField("127.0.0.1");
         this.textFieldPort = new JTextField("55555");
         this.btnConnectToServer = new JButton("Connect");
+        this.lblGameStatus = new JLabel("Waiting for opponent...");
         setupGUI();
     }
     
@@ -96,11 +100,12 @@ public class Player {
                         "The port should be an integer between 1024 and 65535",
                         "Incorrect port", JOptionPane.WARNING_MESSAGE);
             }
-            connectToServer(host, port);
-            this.btnConnectToServer.setEnabled(false);
+            if(connectToServer(host, port))
+                this.btnConnectToServer.setEnabled(false);
         });
         this.window.add(BorderLayout.CENTER, this.canvas);
         this.window.add(BorderLayout.SOUTH, this.connectionPanel);
+        this.window.add(BorderLayout.NORTH, this.lblGameStatus);
         this.window.setResizable(false);
         this.window.setLocationRelativeTo(null);
         this.window.addWindowListener(new WindowAdapter() {
@@ -112,8 +117,10 @@ public class Player {
                         JOptionPane.YES_NO_OPTION);
                 if(reply == JOptionPane.YES_OPTION){
                     if(clientSideConnection != null){
-                        clientSideConnection.sendCloseConenction();
-                        clientSideConnection.closeConnection();
+                        if(!clientSideConnection.socket.isClosed()){
+                            clientSideConnection.sendCloseConenction();
+                            clientSideConnection.closeConnection();
+                        }
                     }
                 System.exit(0);
                 }
@@ -122,28 +129,43 @@ public class Player {
         this.window.setVisible(true);
     }
     
-    public void connectToServer(String host, int port){
-        clientSideConnection = new ClientSideConnection(host, port);
-        startWaitingForMessages();
+    public boolean connectToServer(String host, int port){
+        try {
+            clientSideConnection = new ClientSideConnection(host, port);
+        } catch (Exception ex) {
+            Logger.getLogger(Player.class.getName()).log(Level.SEVERE, null, ex);
+            JOptionPane.showMessageDialog(this.window, ex.getMessage(),
+                    "Error", JOptionPane.ERROR_MESSAGE);
+        }
+        if(clientSideConnection != null){
+            startWaitingForMessages();
+            return true;
+        } else {
+            return false;
+        }
     }
     
     private class ClientSideConnection{
         private Socket socket;
         private DataInputStream dis;
         private DataOutputStream dos;
+        private boolean isServerDisconnected = false;
         
-        public ClientSideConnection(String host, int port){
+        public ClientSideConnection(String host, int port) throws Exception{
             try {
                 System.out.println("---Client side connection---");
                 this.socket = new Socket(host, port);
                 this.dis = new DataInputStream(socket.getInputStream());
                 this.dos = new DataOutputStream(socket.getOutputStream());
-                //isCircle = this.dis.readBoolean();
                 System.out.println("Connected to server as "
                         + (isCircle ? " circle player" : " x player"));
             } catch (IOException ex) {
                 Logger.getLogger(Player.class.getName()).log(Level.SEVERE,
                         null, ex);
+            }
+            if(this.socket == null){
+                System.out.println("Server not started");
+                throw new Exception("Could not connect to server");
             }
         }
         
@@ -152,7 +174,7 @@ public class Player {
                 System.out.println("Client side connection of player "
                         + (isCircle ? "O" : "X"));
                 System.out.println("Sending move = " + move);
-                this.dos.writeInt(2);
+                this.dos.writeInt(MessageType.MOVE.ordinal());
                 this.dos.writeInt(move);
                 this.dos.flush();
             } catch (IOException ex) {
@@ -165,8 +187,10 @@ public class Player {
             try {
                 System.out.println("Player " + (isCircle ? "O" : "X")
                         + " closes conection");
-                this.dos.writeInt(5);
-                this.dos.writeBoolean(true);
+                if(!isServerDisconnected){
+                    this.dos.writeInt(MessageType.DISCONNECTION.ordinal());
+                    this.dos.writeBoolean(true);
+                }
             } catch (IOException ex) {
                 Logger.getLogger(Player.class.getName())
                         .log(Level.SEVERE, null, ex);
@@ -177,27 +201,34 @@ public class Player {
             try {
                 int code = this.dis.readInt();
                 System.out.println("Received code: " + code);
-                switch(code){
-                    case 0:
+                MessageType type = MessageType.values()[code];
+                switch(type){
+                    case IS_CIRCLE:
                         receiveIsCircle();
                         break;
                     //Opponent connected
-                    case 1:
+                    case OPPONENT_READINESS:
                         receiveOpponentReadiness();
                         break;
                         
                     //Opponent move 
-                    case 2:
+                    case MOVE:
                         receiveMove();
                         break;
                         
                     //Game status
-                    case 3:
+                    case GAME_STATUS:
                         receiveGameStatus();
                         break;
                         
                     //First and second spots
-                    case 4:
+                    case WINNIG_LINE_SPOTS:
+                        receiveSpotCoordinates();
+                        break;
+                        
+                    case SERVER_SHUTDOWN:
+                        receiveServerShutdown();                        
+                    case DISCONNECTION:
                         break;
                 }
             } catch (IOException ex) {
@@ -221,6 +252,11 @@ public class Player {
                 }
             }
         }
+
+        private void receiveServerShutdown() throws IOException {
+            isServerDisconnected = this.dis.readBoolean();
+        }
+
         
         private void receiveMove() throws IOException{
             System.out.println("Receiving of the opponent move");
@@ -240,7 +276,25 @@ public class Player {
             System.out.println("index = " + index);
             gameStatus = GameStatus.values()[index];
             System.out.println("Returning game status = " + gameStatus);
+            lblGameStatus.setText(gameStatus.getDescription());
             canvas.repaint();
+        }
+        
+        public void receiveSpotCoordinates() throws IOException{
+            try {
+                int x1 = this.dis.readInt();
+                int y1 = this.dis.readInt();
+                int x2 = this.dis.readInt();
+                int y2 = this.dis.readInt();
+                firstSpot.x = x1 * (SPOT_SIZE + SPOT_GAP) + SPOT_SIZE / 2;
+                firstSpot.y = y1 * (SPOT_SIZE + SPOT_GAP) + SPOT_SIZE / 2;
+                secondSpot.x = x2 * (SPOT_SIZE + SPOT_GAP) + SPOT_SIZE / 2;
+                secondSpot.y = y2 * (SPOT_SIZE + SPOT_GAP) + SPOT_SIZE / 2;
+            } catch (IOException ex) {
+                Logger.getLogger(Player.class.getName()).log(Level.SEVERE,
+                        null, ex);
+                throw ex;
+            }
         }
         
         private void closeConnection(){
@@ -253,6 +307,7 @@ public class Player {
                         null, ex);
             }
         }
+
     }
     
     public void makeMove(int move, boolean isOpponentMove){
@@ -267,11 +322,12 @@ public class Player {
     }
     
     public void printBoard(){
+        System.out.println("------");
         for(int i = 0; i < board.length; ++i){
             for(int j = 0; j < board[i].length; ++j){
-                System.out.print(board[i][j] + "-");
+                System.out.print(board[i][j] + "|");
             }
-            System.out.println("");
+            System.out.println("\n------");
         }
     }
     
@@ -279,7 +335,6 @@ public class Player {
         System.out.println("Waiting for a server message...");
         Thread thread = new Thread(() -> {
             while(!gameStatus.isGameOver()){
-                System.out.println("Loop:Waiting for a server message...");
                 clientSideConnection.receiveMessage();
                 printBoard();
                 this.canvas.repaint();
@@ -288,15 +343,14 @@ public class Player {
         thread.start();
     }
     
-    public void calculatePoints(){
-    }
-    
     private class Canvas extends JPanel implements MouseListener{
         private static final String YOU_WON_TEXT = "You won!!!";
         private static final String YOU_LOST_TEXT = "You lost!!!";
         private static final String TIE_TEXT = "It's tie!!!";
         private static final String WAITING_FOR_OPPONENT_TEXT
                 = "Waiting for opponent...";
+        private static final String OPPONENT_DISCONNECTED_TEXT
+                = "Opponent disconnected";
         private BufferedImage imgBoard;
         private BufferedImage imgRedX;
         private BufferedImage imgBlueX;
@@ -318,11 +372,16 @@ public class Player {
         
         private void loadImages(){
             try {
-                this.imgBoard = ImageIO.read(getClass().getResource("images/board.png"));
-                this.imgRedX = ImageIO.read(getClass().getResource("images/redX.png"));
-                this.imgBlueX = ImageIO.read(getClass().getResource("images/blueX.png"));
-                this.imgRedO = ImageIO.read(getClass().getResource("images/redCircle.png"));
-                this.imgBlueO = ImageIO.read(getClass().getResource("images/blueCircle.png"));
+                this.imgBoard = ImageIO
+                        .read(getClass().getResource("../images/board.png"));
+                this.imgRedX = ImageIO
+                        .read(getClass().getResource("../images/redX.png"));
+                this.imgBlueX = ImageIO
+                        .read(getClass().getResource("../images/blueX.png"));
+                this.imgRedO = ImageIO
+                        .read(getClass().getResource("../images/redCircle.png"));
+                this.imgBlueO = ImageIO
+                        .read(getClass().getResource("../images/blueCircle.png"));
             } catch (IOException ex) {
                 System.out.println("Could not load image: " + ex.getMessage());
                 Logger.getLogger(Player.class.getName()).log(Level.SEVERE, null,
@@ -384,7 +443,7 @@ public class Player {
                     break;
                 case X_WON:
                     drawBoard(g);
-                    drawWinningLine(g, Color.red.darker().darker());
+                    drawWinningLine(g, Color.green.darker().darker());
                     if(isCircle)
                         drawText(g, YOU_LOST_TEXT, fontLarge, colorYouLost);
                     else
@@ -392,7 +451,7 @@ public class Player {
                     break;
                 case O_WON:
                     drawBoard(g);
-                    drawWinningLine(g, Color.blue.darker().darker());
+                    drawWinningLine(g, Color.green.darker().darker());
                     if(isCircle)
                         drawText(g, YOU_WON_TEXT, fontLarge, colorYouWon);
                     else
@@ -403,7 +462,7 @@ public class Player {
                     drawText(g, TIE_TEXT, fontLarge, Color.green);
                     break;
                 case OPPONENT_DISCONNECTED:
-                    drawText(g, "Opponent disconnected", fontMiddle,
+                    drawText(g, OPPONENT_DISCONNECTED_TEXT, fontMiddle,
                             Color.red.darker().darker());
                     break;
             }
@@ -438,12 +497,10 @@ public class Player {
         }
 
         @Override
-        public void mouseEntered(MouseEvent e) {
-        }
+        public void mouseEntered(MouseEvent e) {}
 
         @Override
-        public void mouseExited(MouseEvent e) {
-        }
+        public void mouseExited(MouseEvent e) {}
         
     }
     
