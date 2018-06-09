@@ -14,5 +14,6 @@ public enum MessageType implements Serializable{
     BOARD,
     GAME_STATUS,
     WINNIG_LINE_SPOTS,
-    DISCONNECTION
+    DISCONNECTION,
+    SBOARD
 }

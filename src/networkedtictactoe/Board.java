@@ -32,7 +32,11 @@ public class Board implements Serializable{
     
     public Board(Board other){
         this.boardSize = other.boardSize;
-        this.board = (String[][])other.board.clone();
+        //this.board = (String[][])other.board.clone();
+        this.board = new String[this.boardSize][this.boardSize];
+        for(int i = 0; i < 3; ++i){
+            this.board[i] = (String[])other.board[i].clone();
+        }
         this.firstSpot = (Point)other.firstSpot.clone();
         this.secondSpot = (Point)other.secondSpot.clone();
     }

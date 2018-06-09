@@ -217,7 +217,7 @@ public class Player {
                         
                     //Opponent move 
                     case MOVE:
-                        receiveMove();
+                        //receiveMove();
                         break;
                         
                     case BOARD:
@@ -268,15 +268,15 @@ public class Player {
             }
         }
         
-        private void receiveMove() throws IOException, ClassNotFoundException{
+        /*private void receiveMove() throws IOException, ClassNotFoundException{
             System.out.println("Receiving of the opponent move");
             opponentMove = (Point)this.ois.readObject();
-            board.tryToMove(opponentMove, type.getOpponent());
+            //board.tryToMove(opponentMove, type.getOpponent());
             System.out.println("Client side connection of player "
                         + type.getMoveSign());
             System.out.println("Received opponent move = " + opponentMove);
 
-        }
+        }*/
         
         private boolean receiveMoveAccepted() throws IOException{
             boolean moveAccepted = this.ois.readBoolean();
@@ -286,9 +286,10 @@ public class Player {
         
         private void receiveBoard() throws IOException, ClassNotFoundException{
             Board fromServer = (Board)this.ois.readObject();
-            fromServer.print();
-            //board = new Board(fromServer);
             System.out.println("The board received from server:");
+            fromServer.print();
+            board = fromServer;
+            System.out.println("Our board:");
             if(board != null){
                 board.print();
                 canvas.repaint(); 
@@ -375,11 +376,15 @@ public class Player {
         private Color colorYouLost = new Color(255, 94, 0);
 
         public Canvas(){
+            configureCanvas();
+            loadImages();
+        }
+        
+        private void configureCanvas(){
             setFocusable(true);
             requestFocus();
             setBackground(Color.white);
             addMouseListener(this);
-            loadImages();
         }
         
         private void loadImages(){
@@ -506,7 +511,7 @@ public class Player {
                 System.out.println("sended move = " + move);
                 try {
                     clientSideConnection.sendMove(move);
-                    board.tryToMove(move, type);
+                    //board.tryToMove(move, type);
                 } catch (IOException ex) {
                     Logger.getLogger(Player.class.getName())
                             .log(Level.SEVERE, null, ex);

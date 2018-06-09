@@ -42,6 +42,10 @@ public class GameServer {
                     null, ex);
         }
     }
+
+    public int getPort() {
+        return port;
+    }
     
     public void acceptConnections(){
         System.out.println("Waiting for players...");
@@ -101,7 +105,7 @@ public class GameServer {
         private PlayerType playerType;
         private ObjectOutputStream oos;
         private ObjectInputStream ois;
-        private boolean hasClosedConnection = false;
+        private boolean isLastMoveAccepted = false;
         
         public ServerSideConnection(Socket socket, int playerID){
             try {
@@ -156,40 +160,29 @@ public class GameServer {
                                     + movePlayerO);
                             System.out.println("x = " + movePlayerO.x
                                     + " y = " + movePlayerO.y);
-                            boolean isMoveAccepted = board.tryToMove(
+                            isLastMoveAccepted = board.tryToMove(
                                     movePlayerO, this.playerType);
-                            sendMoveAccepted();
-                            if(isMoveAccepted){
-                                if(playerX != null){
-                                    playerX.sendMove(movePlayerO);
-                                }
-                            }
+                            playerO.sendMoveAccepted();
                         } else if(this.playerType.equals(PlayerType.Cross)) {
                             movePlayerX = (Point)this.ois.readObject();
                             System.out.println("received movePlayerX = "
                                     + movePlayerX);
                             System.out.println("x = " + movePlayerX.x
                                     + " y = " + movePlayerX.y);
-                            boolean isMoveAccepted = board.tryToMove(
+                            isLastMoveAccepted = board.tryToMove(
                                     movePlayerX, this.playerType);
-                            sendMoveAccepted();
-                            if(isMoveAccepted){
-                                if(playerO != null){
-                                    playerO.sendMove(movePlayerX);
-                                }
-                            }
-                            
+                            playerX.sendMoveAccepted();
                         }
-                        board.print();
+
                         checkGameStatus();
                         
                         if(gameStatus.isGameOver()){
                             sendSpotCoordinates();
-                        } else {
-                            if(gameStatus == GameStatus.X_TO_PLAY){
+                        } else if(isLastMoveAccepted) {
+                            if(gameStatus.equals(GameStatus.X_TO_PLAY)){
                                 System.out.println("Changing turn to O");
                                 gameStatus = GameStatus.O_TO_PLAY;
-                            } else if(gameStatus == GameStatus.O_TO_PLAY){
+                            } else if(gameStatus.equals(GameStatus.O_TO_PLAY)){
                                 gameStatus = GameStatus.X_TO_PLAY;
                                 System.out.println("Changing turn to X");
                             }
@@ -208,27 +201,16 @@ public class GameServer {
                             gameStatus = GameStatus.OPPONENT_DISCONNECTED;
                             if(this.playerType.equals(PlayerType.Circle)){
                                 System.out.println("Closing Player O window");
-                                System.out.println("Checking if player X closed connection");
-                                System.out.println("playerX.hasClosedConnection = " + playerO.hasClosedConnection);
-
-                                if(playerX != null && !playerX.hasClosedConnection){
+                                
+                                if(playerX != null){
                                     playerX.sendGameStatus(gameStatus);
                                 }
-                                playerO.hasClosedConnection = true;
-                                System.out.println("playerO.hasClosedConnection = " + playerO.hasClosedConnection);
                             } else if(this.playerType.equals(PlayerType.Cross)){
                                 System.out.println("Closing Player X window");
-                                System.out.println("Checking if player O closed connection");
-                                System.out.println("playerX.hasClosedConnection = " + playerX.hasClosedConnection);
-                                if(playerO != null && !playerO.hasClosedConnection){
+                                if(playerO != null){
                                     playerO.sendGameStatus(gameStatus);                                    
                                 }
-                                System.out.println("");
-                                //playerX.closeConnection();
-                                playerX.hasClosedConnection = true;
-                                System.out.println("playerX.hasClosedConnection = " + playerX.hasClosedConnection);
                             }
-                            hasClosedConnection = true;
                         }
                         break;
                 }
@@ -261,7 +243,7 @@ public class GameServer {
                 throw ex;
             }
         }
-        
+        /*
         private void sendMove(Point move) throws IOException{
             try {
                 System.out.println("Sending move from server " + move);
@@ -275,15 +257,13 @@ public class GameServer {
                 throw ex;
             }
         }
-        
+        */
         private void sendBoard(Board b){
             try {
                 System.out.println("Sending board from server to player "
                         + playerType.getMoveSign());
                 this.oos.writeObject(MessageType.BOARD);
                 Board brd = new Board(b);
-                System.out.println("brd:");
-                brd.print();
                 this.oos.writeObject(brd);
                 this.oos.flush();
             } catch (IOException ex) {
@@ -340,8 +320,7 @@ public class GameServer {
                 Logger.getLogger(GameServer.class.getName()).log(Level.SEVERE,
                         null, ex);
             }
-        }
-        
+        }        
     }
     
     public static void main(String[] args) {
