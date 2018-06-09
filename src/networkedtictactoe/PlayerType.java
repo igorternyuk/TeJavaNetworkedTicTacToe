@@ -1,10 +1,12 @@
 package networkedtictactoe;
 
+import java.io.Serializable;
+
 /**
  *
  * @author igor
  */
-public enum PlayerType {
+public enum PlayerType implements Serializable{
     Circle("O"),
     Cross("X");
     

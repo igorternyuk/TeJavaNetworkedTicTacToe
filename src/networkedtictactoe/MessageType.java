@@ -1,10 +1,12 @@
 package networkedtictactoe;
 
+import java.io.Serializable;
+
 /**
  *
  * @author igor
  */
-public enum MessageType {
+public enum MessageType implements Serializable{
     PLAYER_TYPE,
     OPPONENT_READINESS,
     MOVE,

@@ -1,10 +1,12 @@
 package networkedtictactoe;
 
+import java.io.Serializable;
+
 /**
  *
  * @author igor
  */
-public enum GameStatus {
+public enum GameStatus implements Serializable{
     WAINTING_FOR_OPPONENT("Waiting for opponent...") {
         @Override
         public boolean isGameOver() {

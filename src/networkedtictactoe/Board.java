@@ -1,16 +1,16 @@
 package networkedtictactoe;
 
 import java.awt.Point;
+import java.io.Serializable;
 
 /**
  *
  * @author igor
  */
-public class Board {
+public class Board implements Serializable{
     private static final int DEFAULT_BOARD_SIZE = 3;
     private int boardSize;
     private String[][] board;
-    int x1, y1, x2, y2;
     Point firstSpot, secondSpot; 
     
     public Board(){
@@ -21,6 +21,11 @@ public class Board {
     
     public Board(int size){
         this.board = new String[size][size];
+        for(int i = 0; i < boardSize; ++i){
+            for(int j = 0; j < boardSize; ++j){
+                this.board[i][j] = " ";
+            }
+        }
         this.boardSize = size;
     }
 
@@ -36,10 +41,18 @@ public class Board {
         return secondSpot;
     }
     
+    public String valueAt(int x, int y){
+        return isCoordinatesValid(x, y) ? board[y][x] : "";
+    }
+    
+    private boolean isCoordinatesValid(int x, int y){
+        return x >= 0 && x < this.boardSize
+                && y >= 0 && y < this.boardSize;
+    }
+    
     public boolean tryToMove(Point move, PlayerType type){
-        if(move.x >= 0 && move.x < this.boardSize
-            && move.y >= 0 && move.y < this.boardSize
-            && this.board[move.y][move.x].isEmpty()){
+        if(isCoordinatesValid(move.x, move.y)
+           && this.board[move.y][move.x].equals(" ")){
             makeMove(move, type);
             return true;
         }

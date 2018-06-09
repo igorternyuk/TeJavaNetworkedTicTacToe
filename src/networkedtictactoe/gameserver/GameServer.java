@@ -48,6 +48,7 @@ public class GameServer {
         System.out.println("Waiting for players...");
         try{
             while(numPlayers < PLAYER_COUNT_MAX){
+                System.out.println("Accepting loop...");
                 Socket socket = this.serverSocket.accept();
                 ++numPlayers;
                 System.out.println("Player #" + numPlayers + " connected");
@@ -65,6 +66,7 @@ public class GameServer {
                     playerX.sendGameStatus(gameStatus);
 
                 }
+                System.out.println("Starting thread...");
                 Thread thread = new Thread(ssc);
                 thread.start();
             }
@@ -81,8 +83,8 @@ public class GameServer {
         private Socket socket;
         private int playerId;
         private PlayerType playerType;
-        private ObjectInputStream ois;
         private ObjectOutputStream oos;
+        private ObjectInputStream ois;
         private boolean hasClosedConnection = false;
         
         public ServerSideConnection(Socket socket, int playerID){
@@ -94,8 +96,9 @@ public class GameServer {
                 this.playerType = (playerID == 1)
                                 ? PlayerType.Circle
                                 : PlayerType.Cross;
-                this.ois = new ObjectInputStream(this.socket.getInputStream());
                 this.oos = new ObjectOutputStream(this.socket.getOutputStream());
+                this.ois = new ObjectInputStream(this.socket.getInputStream());
+                System.out.println("ClientSideConnection constructor finished its work");
             } catch (IOException ex) {
                 Logger.getLogger(GameServer.class.getName()).log(Level.SEVERE,
                         null, ex);
@@ -104,8 +107,10 @@ public class GameServer {
 
         @Override
         public void run() {
+            System.out.println("Starting ServerSideConnection thread for player #" + playerId);
             try {
                 sendPlayerType();
+                sendBoard(board);
                 while(!gameStatus.isGameOver()){
                     board.checkGameStatus(gameStatus);
                     /*if(gameStatus.isGameOver()){

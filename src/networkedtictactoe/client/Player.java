@@ -14,8 +14,6 @@ import java.awt.event.MouseListener;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
 import java.awt.image.BufferedImage;
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
@@ -32,6 +30,7 @@ import javax.swing.JTextField;
 import networkedtictactoe.Board;
 import networkedtictactoe.GameStatus;
 import networkedtictactoe.MessageType;
+import networkedtictactoe.PlayerType;
 
 /**
  *
@@ -56,7 +55,8 @@ public class Player {
     private JButton btnConnectToServer;
     private Board board = null;
     private boolean isCircle = false;
-    private int opponentMove = 0;
+    private PlayerType type = PlayerType.Circle;
+    private Point opponentMove = null;
     private GameStatus gameStatus = GameStatus.WAINTING_FOR_OPPONENT;
     private Point firstSpot = new Point(-1,-1);
     private Point secondSpot = new Point(-1,-1);
@@ -146,17 +146,18 @@ public class Player {
     
     private class ClientSideConnection implements Runnable{
         private Socket socket;
-        private ObjectInputStream ois;
         private ObjectOutputStream oos;
+        private ObjectInputStream ois;
         
         public ClientSideConnection(String host, int port) throws Exception{
             try {
                 System.out.println("---Client side connection---");
                 this.socket = new Socket(host, port);
-                this.ois = new ObjectInputStream(socket.getInputStream());
                 this.oos = new ObjectOutputStream(socket.getOutputStream());
+                this.ois = new ObjectInputStream(socket.getInputStream());
                 System.out.println("Connected to server as "
-                        + (isCircle ? " circle player" : " x player"));
+                        + type.getMoveSign() + " player");
+                
             } catch (IOException ex) {
                 Logger.getLogger(Player.class.getName()).log(Level.SEVERE,
                         null, ex);
@@ -167,17 +168,20 @@ public class Player {
             }
         }
         
-        public void sendMove(int move){
+        public void sendMove(Point move) throws IOException{
             try {
                 System.out.println("Client side connection of player "
-                        + (isCircle ? "O" : "X"));
+                        + type.getMoveSign());
                 System.out.println("Sending move = " + move);
-                this.dos.writeInt(MessageType.MOVE.ordinal());
-                this.dos.writeInt(move);
-                this.dos.flush();
+                this.oos.writeObject(MessageType.MOVE);
+                this.oos.writeObject(move);
+                this.oos.flush();
             } catch (IOException ex) {
+                System.out.println("IOException from ClientSideConnection"
+                        + " sendMove(Point move)");
                 Logger.getLogger(Player.class.getName()).log(Level.SEVERE,
                         null, ex);
+                throw ex;
             }
         }
         
@@ -185,31 +189,39 @@ public class Player {
             try {
                 System.out.println("Player " + (isCircle ? "O" : "X")
                         + " closes conection");
-                this.dos.writeInt(MessageType.DISCONNECTION.ordinal());
-                this.dos.writeBoolean(true);
+                this.oos.writeObject(MessageType.DISCONNECTION);
+                this.oos.writeBoolean(true);
+                this.oos.flush();
             } catch (IOException ex) {
                 Logger.getLogger(Player.class.getName())
                         .log(Level.SEVERE, null, ex);
             }
         }
         
-        public void receiveMessage(){
+        public void receiveMessage() throws IOException, ClassNotFoundException{
             try {
-                int code = this.dis.readInt();
-                System.out.println("Received code: " + code);
-                MessageType type = MessageType.values()[code];
+                MessageType type = (MessageType)this.ois.readObject();
+                System.out.println("Received code: " + type);
                 switch(type){
                     case PLAYER_TYPE:
-                        receiveIsCircle();
+                       receivePlayerType();
                         break;
                     //Opponent connected
                     case OPPONENT_READINESS:
                         receiveOpponentReadiness();
                         break;
                         
+                    case MOVE_ACCEPTED:
+                        receiveMoveAccepted();
+                        break;
+                        
                     //Opponent move 
                     case MOVE:
                         receiveMove();
+                        break;
+                        
+                    case BOARD:
+                        receiveBoard();
                         break;
                         
                     //Game status
@@ -226,19 +238,28 @@ public class Player {
                         break;
                 }
             } catch (IOException ex) {
+                System.out.println("IOException from ClientSideConnection "
+                        + "receiveMessage()");
                 Logger.getLogger(Player.class.getName()).log(Level.SEVERE,
                         null, ex);
+                throw ex;
+            } catch (ClassNotFoundException ex) {
+                System.out.println("ClassNotFoundException from"
+                        + " ClientSideConnection receiveMessage()");
+                Logger.getLogger(Player.class.getName()).log(Level.SEVERE,
+                        null, ex);
+                throw ex;
             }
         }
         
-        private void receiveIsCircle() throws IOException{
-            isCircle = this.dis.readBoolean();
-            System.out.println("Receiving isCircle " + isCircle);
+        private void receivePlayerType() throws IOException, ClassNotFoundException{
+            type = (PlayerType)this.ois.readObject();
+            System.out.println("Receiving player type " + type.getMoveSign());
         }
         
         private void receiveOpponentReadiness() throws IOException{
-            if(isCircle){
-                boolean isOpponentConnected = this.dis.readBoolean();
+            if(type.equals(PlayerType.Circle)){
+                boolean isOpponentConnected = this.ois.readBoolean();
                 System.out.println("Receiving opponent readiness");
                 if(isOpponentConnected){
                     gameStatus = GameStatus.O_TO_PLAY;
@@ -247,38 +268,46 @@ public class Player {
             }
         }
         
-        private void receiveMove() throws IOException{
+        private void receiveMove() throws IOException, ClassNotFoundException{
             System.out.println("Receiving of the opponent move");
-            System.out.println("this.dis.available() = " + this.dis.available());
-            opponentMove = this.dis.readInt();
+            opponentMove = (Point)this.ois.readObject();
             
             System.out.println("Client side connection of player "
-                        + (isCircle ? "O" : "X"));
+                        + type.getMoveSign());
             System.out.println("Received opponent move = " + opponentMove);
-            makeMove(opponentMove, true);
-            canvas.repaint();
+
         }
         
-        private void receiveGameStatus() throws IOException {
+        private boolean receiveMoveAccepted() throws IOException{
+            boolean moveAccepted = this.ois.readBoolean();
+            System.out.println("Received moveAccepted " + moveAccepted);
+            return moveAccepted;
+        }
+        
+        private void receiveBoard() throws IOException, ClassNotFoundException{
+            board = (Board)this.ois.readObject();
+            System.out.println("The board received from server:");
+            if(board != null){
+                board.print();
+                canvas.repaint(); 
+            }
+        }
+        
+        private void receiveGameStatus() throws IOException, ClassNotFoundException {
             System.out.println("Receiving the new game status");
-            int index = this.dis.readInt();
-            System.out.println("index = " + index);
-            gameStatus = GameStatus.values()[index];
-            System.out.println("Returning game status = " + gameStatus);
+            gameStatus = (GameStatus)this.ois.readObject();
             lblGameStatus.setText(gameStatus.getDescription());
             canvas.repaint();
         }
         
-        public void receiveSpotCoordinates() throws IOException{
+        public void receiveSpotCoordinates() throws IOException, ClassNotFoundException{
             try {
-                int x1 = this.dis.readInt();
-                int y1 = this.dis.readInt();
-                int x2 = this.dis.readInt();
-                int y2 = this.dis.readInt();
-                firstSpot.x = x1 * (SPOT_SIZE + SPOT_GAP) + SPOT_SIZE / 2;
-                firstSpot.y = y1 * (SPOT_SIZE + SPOT_GAP) + SPOT_SIZE / 2;
-                secondSpot.x = x2 * (SPOT_SIZE + SPOT_GAP) + SPOT_SIZE / 2;
-                secondSpot.y = y2 * (SPOT_SIZE + SPOT_GAP) + SPOT_SIZE / 2;
+                firstSpot = (Point)this.ois.readObject();
+                secondSpot = (Point)this.ois.readObject();
+                firstSpot.x = firstSpot.x * (SPOT_SIZE + SPOT_GAP) + SPOT_SIZE / 2;
+                firstSpot.y = firstSpot.y * (SPOT_SIZE + SPOT_GAP) + SPOT_SIZE / 2;
+                secondSpot.x = secondSpot.x * (SPOT_SIZE + SPOT_GAP) + SPOT_SIZE / 2;
+                secondSpot.y = secondSpot.y * (SPOT_SIZE + SPOT_GAP) + SPOT_SIZE / 2;
             } catch (IOException ex) {
                 Logger.getLogger(Player.class.getName()).log(Level.SEVERE,
                         null, ex);
@@ -288,8 +317,10 @@ public class Player {
         
         private void closeConnection(){
             try {
+                this.oos.close();
+                this.ois.close();
                 this.socket.close();
-                System.out.println("Player " + (isCircle ? "O" : "X")
+                System.out.println("Player " + type.getMoveSign()
                         + " closed connection");
             } catch (IOException ex) {
                 Logger.getLogger(Player.class.getName()).log(Level.SEVERE,
@@ -299,10 +330,19 @@ public class Player {
 
         @Override
         public void run() {
-            while(!gameStatus.isGameOver()){
-                clientSideConnection.receiveMessage();
-                board.print();
-                canvas.repaint();
+            try{
+                while(!gameStatus.isGameOver()){
+                    clientSideConnection.receiveMessage();
+                    if(board != null){
+                        board.print();
+                    }
+                    canvas.repaint();
+                }
+            } catch(IOException | ClassNotFoundException ex){
+                Logger.getLogger(Player.class.getName()).log(Level.SEVERE,
+                        null, ex);
+            } finally{
+                closeConnection();
             }
         }
     }
@@ -371,20 +411,22 @@ public class Player {
         
         private void drawBoard(Graphics g){
             g.drawImage(imgBoard, 0, 0, null);
-            for(int i = 0; i < board.length; ++i){
-                for(int j = 0; j < board[i].length; ++j){
-                    if("X".equalsIgnoreCase(board[i][j])){
-                        if(isCircle)
+            for(int i = 0; i < board.getBoardSize(); ++i){
+                for(int j = 0; j < board.getBoardSize(); ++j){
+                    if(PlayerType.Cross.getMoveSign()
+                            .equalsIgnoreCase(board.valueAt(j, i))){
+                        if(type.equals(PlayerType.Circle))
                             g.drawImage(imgRedX, j * (SPOT_SIZE + SPOT_GAP),
                                         i * (SPOT_SIZE + SPOT_GAP), null);
-                        else
+                        else if(type.equals(PlayerType.Cross))
                             g.drawImage(imgBlueX, j * (SPOT_SIZE + SPOT_GAP),
                                         i * (SPOT_SIZE + SPOT_GAP), null);
-                    } else if("O".equalsIgnoreCase(board[i][j])){
-                        if(isCircle)
+                    } else if(PlayerType.Circle.getMoveSign()
+                            .equalsIgnoreCase(board.valueAt(j, i))){
+                        if(type.equals(PlayerType.Circle))
                             g.drawImage(imgBlueO,  j * (SPOT_SIZE + SPOT_GAP),
                                         i * (SPOT_SIZE + SPOT_GAP), null);
-                        else
+                        else if(type.equals(PlayerType.Cross))
                             g.drawImage(imgRedO,  j * (SPOT_SIZE + SPOT_GAP),
                                         i * (SPOT_SIZE + SPOT_GAP), null);
                     }
@@ -453,14 +495,17 @@ public class Player {
             System.out.println("isCircle = " + isCircle);
             System.out.println("Mouse released x = " + x + " y = " + y);
             System.out.println("gameStatus = " + gameStatus);
-            if((isCircle && gameStatus == GameStatus.O_TO_PLAY)
-               || (!isCircle && gameStatus == GameStatus.X_TO_PLAY)){
-                System.out.println("board[y][x] = " + board[y][x]);
-                if(board[y][x].equals(" ")){
-                    int move = y * BOARD_SIZE + x;
-                    System.out.println("sended move = " + move);
-                    makeMove(move, false);
+            if((type.equals(PlayerType.Circle)
+                && gameStatus == GameStatus.O_TO_PLAY)
+               || (type.equals(PlayerType.Cross)
+                   && gameStatus == GameStatus.X_TO_PLAY)){
+                Point move = new Point(x, y);
+                System.out.println("sended move = " + move);
+                try {
                     clientSideConnection.sendMove(move);
+                } catch (IOException ex) {
+                    Logger.getLogger(Player.class.getName())
+                            .log(Level.SEVERE, null, ex);
                 }
             }
             this.repaint();
