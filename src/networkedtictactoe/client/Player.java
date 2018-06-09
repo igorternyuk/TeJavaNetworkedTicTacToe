@@ -17,6 +17,8 @@ import java.awt.image.BufferedImage;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
 import java.net.Socket;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -27,6 +29,7 @@ import javax.swing.JLabel;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JTextField;
+import networkedtictactoe.Board;
 import networkedtictactoe.GameStatus;
 import networkedtictactoe.MessageType;
 
@@ -51,11 +54,7 @@ public class Player {
     private JTextField textFieldHost;
     private JTextField textFieldPort;
     private JButton btnConnectToServer;
-    private String[][] board = {
-        { " ", " ", " " },
-        { " ", " ", " " },
-        { " ", " ", " " }
-    };
+    private Board board = null;
     private boolean isCircle = false;
     private int opponentMove = 0;
     private GameStatus gameStatus = GameStatus.WAINTING_FOR_OPPONENT;
@@ -145,17 +144,17 @@ public class Player {
         }
     }
     
-    private class ClientSideConnection{
+    private class ClientSideConnection implements Runnable{
         private Socket socket;
-        private DataInputStream dis;
-        private DataOutputStream dos;
+        private ObjectInputStream ois;
+        private ObjectOutputStream oos;
         
         public ClientSideConnection(String host, int port) throws Exception{
             try {
                 System.out.println("---Client side connection---");
                 this.socket = new Socket(host, port);
-                this.dis = new DataInputStream(socket.getInputStream());
-                this.dos = new DataOutputStream(socket.getOutputStream());
+                this.ois = new ObjectInputStream(socket.getInputStream());
+                this.oos = new ObjectOutputStream(socket.getOutputStream());
                 System.out.println("Connected to server as "
                         + (isCircle ? " circle player" : " x player"));
             } catch (IOException ex) {
@@ -200,7 +199,7 @@ public class Player {
                 System.out.println("Received code: " + code);
                 MessageType type = MessageType.values()[code];
                 switch(type){
-                    case IS_CIRCLE:
+                    case PLAYER_TYPE:
                         receiveIsCircle();
                         break;
                     //Opponent connected
@@ -298,38 +297,19 @@ public class Player {
             }
         }
 
-    }
-    
-    public void makeMove(int move, boolean isOpponentMove){
-        System.out.println("Making move...");
-        int y = move / BOARD_SIZE;
-        int x = move % BOARD_SIZE;
-        System.out.println("x = " + x + " y = " + y);
-        if(isOpponentMove)
-            this.board[y][x] = isCircle ? "X" : "O";
-        else
-            this.board[y][x] = isCircle ? "O" : "X";
-    }
-    
-    public void printBoard(){
-        System.out.println("------");
-        for(int i = 0; i < board.length; ++i){
-            for(int j = 0; j < board[i].length; ++j){
-                System.out.print(board[i][j] + "|");
+        @Override
+        public void run() {
+            while(!gameStatus.isGameOver()){
+                clientSideConnection.receiveMessage();
+                board.print();
+                canvas.repaint();
             }
-            System.out.println("\n------");
         }
     }
     
     public void startWaitingForMessages(){
         System.out.println("Waiting for a server message...");
-        Thread thread = new Thread(() -> {
-            while(!gameStatus.isGameOver()){
-                clientSideConnection.receiveMessage();
-                printBoard();
-                this.canvas.repaint();
-            }
-        });
+        Thread thread = new Thread(clientSideConnection);
         thread.start();
     }
     

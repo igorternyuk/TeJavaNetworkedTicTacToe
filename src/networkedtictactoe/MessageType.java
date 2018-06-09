@@ -5,11 +5,12 @@ package networkedtictactoe;
  * @author igor
  */
 public enum MessageType {
-    IS_CIRCLE,
+    PLAYER_TYPE,
     OPPONENT_READINESS,
     MOVE,
+    MOVE_ACCEPTED,
+    BOARD,
     GAME_STATUS,
     WINNIG_LINE_SPOTS,
-    DISCONNECTION,
-    SERVER_SHUTDOWN
+    DISCONNECTION
 }

@@ -1,5 +1,7 @@
 package networkedtictactoe;
 
+import java.awt.Point;
+
 /**
  *
  * @author igor
@@ -9,20 +11,53 @@ public class Board {
     private int boardSize;
     private String[][] board;
     int x1, y1, x2, y2;
+    Point firstSpot, secondSpot; 
     
     public Board(){
         this(DEFAULT_BOARD_SIZE);
+        this.firstSpot = new Point(-1,-1);
+        this.secondSpot = new Point(-1,-1);
     }
     
     public Board(int size){
         this.board = new String[size][size];
         this.boardSize = size;
     }
+
+    public int getBoardSize() {
+        return boardSize;
+    }
+
+    public Point getFirstSpot() {
+        return firstSpot;
+    }
+
+    public Point getSecondSpot() {
+        return secondSpot;
+    }
     
-    public void makeMove(int move, PlayerType type){
-        System.out.println("Making move...");
+    public boolean tryToMove(Point move, PlayerType type){
+        if(move.x >= 0 && move.x < this.boardSize
+            && move.y >= 0 && move.y < this.boardSize
+            && this.board[move.y][move.x].isEmpty()){
+            makeMove(move, type);
+            return true;
+        }
+        return false;
+    }
+    
+    private void makeMove(int move, PlayerType type){
         int y = move / boardSize;
         int x = move % boardSize;
+        makeMove(x, y, type);
+    }
+    
+    private void makeMove(Point move, PlayerType type){
+        makeMove(move.x, move.y, type);
+    }
+    
+    private void makeMove(int x, int y, PlayerType type){
+        System.out.println("Making move...");
         System.out.println("x = " + x + " y = " + y);
         this.board[y][x] = type.getMoveSign();
     }
@@ -39,7 +74,7 @@ public class Board {
         return count;
     }
     
-    private void checkGameStatus(GameStatus gameStatus){
+    public void checkGameStatus(GameStatus gameStatus){
         System.out.println("Checking game status");
         //Check rows
         outer:
@@ -50,15 +85,15 @@ public class Board {
                 if(!board[i][j].equalsIgnoreCase(first))
                     continue outer;
             }
-            if(first.equalsIgnoreCase("X")){
+            if(first.equalsIgnoreCase(PlayerType.Cross.getMoveSign())){
                 gameStatus = GameStatus.X_WON;
-            } else if(first.equalsIgnoreCase("O")){
+            } else if(first.equalsIgnoreCase(PlayerType.Circle.getMoveSign())){
                 gameStatus = GameStatus.O_WON;
             }
-            x1 = 0;
-            y1 = i;
-            x2 = boardSize - 1;
-            y2 = y1;
+            this.firstSpot.x = 0;
+            this.firstSpot.y = i;
+            this.secondSpot.x = boardSize - 1;
+            this.secondSpot.y = this.firstSpot.y;
             return;
         }
         
@@ -71,15 +106,15 @@ public class Board {
                 if(!board[i][j].equalsIgnoreCase(first))
                     continue outer;
             }
-            if(first.equalsIgnoreCase("X")){
+            if(first.equalsIgnoreCase(PlayerType.Cross.getMoveSign())){
                 gameStatus = GameStatus.X_WON;
-            } else if(first.equalsIgnoreCase("O")){
+            } else if(first.equalsIgnoreCase(PlayerType.Circle.getMoveSign())){
                 gameStatus = GameStatus.O_WON;
             }
-            x1 = j;
-            y1 = 0;
-            x2 = x1;
-            y2 = this.boardSize - 1;
+            this.firstSpot.x = j;
+            this.firstSpot.y = 0;
+            this.secondSpot.x = this.firstSpot.x;
+            this.secondSpot.y = this.boardSize - 1;
             return;
         }
         
@@ -99,15 +134,15 @@ public class Board {
         }
         
         if(isMainDiagonalFilled){
-            if(first.equalsIgnoreCase("X")){
+            if(first.equalsIgnoreCase(PlayerType.Cross.getMoveSign())){
                 gameStatus = GameStatus.X_WON;
-            } else if(first.equalsIgnoreCase("O")){
+            } else if(first.equalsIgnoreCase(PlayerType.Circle.getMoveSign())){
                 gameStatus = GameStatus.O_WON;
             }
-            x1 = 0;
-            y1 = 0;
-            x2 = this.boardSize - 1;
-            y2 = this.boardSize - 1;
+            this.firstSpot.x = 0;
+            this.firstSpot.y = 0;
+            this.secondSpot.x = this.boardSize - 1;
+            this.secondSpot.y = this.boardSize - 1;
             return;
         }
         
@@ -126,15 +161,15 @@ public class Board {
         }
         
         if(isSecondaryDiagonalFilled){
-            if(first.equalsIgnoreCase("X")){
+            if(first.equalsIgnoreCase(PlayerType.Cross.getMoveSign())){
                 gameStatus = GameStatus.X_WON;
-            } else if(first.equalsIgnoreCase("O")){
+            } else if(first.equalsIgnoreCase(PlayerType.Circle.getMoveSign())){
                 gameStatus = GameStatus.O_WON;
             }
-            x1 = this.boardSize - 1;
-            y1 = 0;
-            x2 = 0;
-            y2 = this.boardSize - 1;
+            this.firstSpot.x = this.boardSize - 1;
+            this.firstSpot.y = 0;
+            this.secondSpot.x = 0;
+            this.secondSpot.y = this.boardSize - 1;
             return;
         }
         if(countFreeSpots() == 0)
