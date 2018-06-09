@@ -118,7 +118,7 @@ public class Player {
                 if(reply == JOptionPane.YES_OPTION){
                     if(clientSideConnection != null){
                         if(!clientSideConnection.socket.isClosed()){
-                            clientSideConnection.sendCloseConenction();
+                            //clientSideConnection.sendCloseConenction();
                             clientSideConnection.closeConnection();
                         }
                     }
@@ -149,7 +149,6 @@ public class Player {
         private Socket socket;
         private DataInputStream dis;
         private DataOutputStream dos;
-        private boolean isServerDisconnected = false;
         
         public ClientSideConnection(String host, int port) throws Exception{
             try {
@@ -187,10 +186,8 @@ public class Player {
             try {
                 System.out.println("Player " + (isCircle ? "O" : "X")
                         + " closes conection");
-                if(!isServerDisconnected){
-                    this.dos.writeInt(MessageType.DISCONNECTION.ordinal());
-                    this.dos.writeBoolean(true);
-                }
+                this.dos.writeInt(MessageType.DISCONNECTION.ordinal());
+                this.dos.writeBoolean(true);
             } catch (IOException ex) {
                 Logger.getLogger(Player.class.getName())
                         .log(Level.SEVERE, null, ex);
@@ -225,9 +222,7 @@ public class Player {
                     case WINNIG_LINE_SPOTS:
                         receiveSpotCoordinates();
                         break;
-                        
-                    case SERVER_SHUTDOWN:
-                        receiveServerShutdown();                        
+                                              
                     case DISCONNECTION:
                         break;
                 }
@@ -252,11 +247,6 @@ public class Player {
                 }
             }
         }
-
-        private void receiveServerShutdown() throws IOException {
-            isServerDisconnected = this.dis.readBoolean();
-        }
-
         
         private void receiveMove() throws IOException{
             System.out.println("Receiving of the opponent move");

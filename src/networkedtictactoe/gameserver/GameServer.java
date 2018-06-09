@@ -3,10 +3,13 @@ package networkedtictactoe.gameserver;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import networkedtictactoe.Board;
 import networkedtictactoe.GameStatus;
 import networkedtictactoe.MessageType;
 
@@ -17,22 +20,20 @@ import networkedtictactoe.MessageType;
 public class GameServer {
     private static final int PLAYER_COUNT_MAX = 2;
     private static final int BOARD_SIZE = 3;
-    private int port;
-    private ServerSocket serverSocket;
+    private Board board;
     private int numPlayers = 0;
-    private ServerSideConnection playerO;
-    private ServerSideConnection playerX;
-    private String[][] board = {
-        { " ", " ", " " },
-        { " ", " ", " " },
-        { " ", " ", " " }
-    };
     private int movePlayerO, movePlayerX;
     private GameStatus gameStatus;
     private int x1, y1, x2, y2;
     
+    private int port;
+    private ServerSocket serverSocket;
+    private ServerSideConnection playerO;
+    private ServerSideConnection playerX;
+    
     public GameServer(int port){
         System.out.println("---Game server---");
+        this.board = new Board();
         this.port = port;
         try {
             this.serverSocket = new ServerSocket(port);
@@ -75,136 +76,14 @@ public class GameServer {
         }
     }
     
-    public void printBoard(){
-        System.out.println("------");
-        for(int i = 0; i < board.length; ++i){
-            for(int j = 0; j < board[i].length; ++j){
-                System.out.print(board[i][j] + "|");
-            }
-            System.out.println("\n------");
-        }
-    }
-    
-    private int countFreeSpots(){
-        int count = 0;
-        for(int i = 0; i < BOARD_SIZE; ++i){
-            for(int j = 0; j < BOARD_SIZE; ++j){
-                if(board[i][j].equals(" ")){
-                    ++count;
-                }
-            }
-        }
-        return count;
-    }
-    
-    private void checkGameStatus(){
-        System.out.println("Checking game status");
-        //Check rows
-        outer:
-        for(int i = 0; i < board.length; ++i){
-            String first = board[i][0];
-            if(first.isEmpty()) continue;
-            for(int j = 1; j < board[i].length; ++j){
-                if(!board[i][j].equalsIgnoreCase(first))
-                    continue outer;
-            }
-            if(first.equalsIgnoreCase("X")){
-                gameStatus = GameStatus.X_WON;
-            } else if(first.equalsIgnoreCase("O")){
-                gameStatus = GameStatus.O_WON;
-            }
-            x1 = 0;
-            y1 = i;
-            x2 = BOARD_SIZE - 1;
-            y2 = y1;
-            return;
-        }
-        
-        //Check columns
-        outer:
-        for(int j = 0; j < BOARD_SIZE; ++j){
-            String first = board[0][j];
-            if(first.isEmpty()) continue;
-            for(int i = 1; i < BOARD_SIZE; ++i){
-                if(!board[i][j].equalsIgnoreCase(first))
-                    continue outer;
-            }
-            if(first.equalsIgnoreCase("X")){
-                gameStatus = GameStatus.X_WON;
-            } else if(first.equalsIgnoreCase("O")){
-                gameStatus = GameStatus.O_WON;
-            }
-            x1 = j;
-            y1 = 0;
-            x2 = x1;
-            y2 = BOARD_SIZE - 1;
-            return;
-        }
-        
-        //Check main diagonal
-        String first = board[0][0];
-        boolean isMainDiagonalFilled = true;
-        if(first.isEmpty()){
-            isMainDiagonalFilled = false;
-        } else {
-            for(int i = 1; i < BOARD_SIZE; ++i){
-                first = board[0][0];
-                if(!board[i][i].equalsIgnoreCase(first)){
-                    isMainDiagonalFilled = false;
-                    break;
-                }
-            }
-        }
-        
-        if(isMainDiagonalFilled){
-            if(first.equalsIgnoreCase("X")){
-                gameStatus = GameStatus.X_WON;
-            } else if(first.equalsIgnoreCase("O")){
-                gameStatus = GameStatus.O_WON;
-            }
-            x1 = 0;
-            y1 = 0;
-            x2 = BOARD_SIZE - 1;
-            y2 = BOARD_SIZE - 1;
-            return;
-        }
-        
-        //Check secondary diagonal
-        boolean isSecondaryDiagonalFilled = true;
-        first = board[0][BOARD_SIZE - 1];
-        if(first.isEmpty()){
-            isSecondaryDiagonalFilled = false;
-        } else {
-            for(int i = 1; i < BOARD_SIZE; ++i){
-                if(!board[i][BOARD_SIZE - 1 - i].equalsIgnoreCase(first)){
-                    isSecondaryDiagonalFilled = false;
-                    break;
-                }
-            }
-        }
-        
-        if(isSecondaryDiagonalFilled){
-            if(first.equalsIgnoreCase("X")){
-                gameStatus = GameStatus.X_WON;
-            } else if(first.equalsIgnoreCase("O")){
-                gameStatus = GameStatus.O_WON;
-            }
-            x1 = BOARD_SIZE - 1;
-            y1 = 0;
-            x2 = 0;
-            y2 = BOARD_SIZE - 1;
-            return;
-        }
-        if(countFreeSpots() == 0)
-            gameStatus = GameStatus.TIE;
-    }
-    
     private class ServerSideConnection implements Runnable {
         private Socket socket;
         private int playerId;
         private boolean isCircle;
         private DataInputStream dis;
         private DataOutputStream dos;
+        private ObjectInputStream ois;
+        private ObjectOutputStream oos;
         private boolean hasClosedConnection = false;
         
         public ServerSideConnection(Socket socket, int playerID){
@@ -236,33 +115,36 @@ public class GameServer {
             
             while(true){
                 checkGameStatus();
+                if(gameStatus.isGameOver()){
+                    System.out.println("---GAME OVER---");
+                    break;
+                }
+                if(playerO.hasClosedConnection || playerO.hasClosedConnection){
+                    System.out.println("break server thread loop");
+                    break;
+                }
                 try{
                     receiveMessage();
                 } catch(IOException ex){
                     
                 }
-                if(gameStatus.isGameOver()){
-                    System.out.println("---GAME OVER---");
-                    sendServerShutdown();
-                    break;
+                
+            }
+            playerO.closeConnection();
+            playerX.closeConnection();
+        }
+        
+        private synchronized void receiveMessage() throws IOException{
+            try {
+                if(playerO.hasClosedConnection || playerO.hasClosedConnection){
+                    System.out.println("break server thread loop");
+                    return;
                 }
-            }
-            //closeConnection();
-        }
-        
-        private void sendServerShutdown(){
-            try {
-                this.dos.writeInt(MessageType.SERVER_SHUTDOWN.ordinal());
-                this.dos.writeBoolean(true);
-                this.dos.flush();
-            } catch (IOException ex) {
-                Logger.getLogger(GameServer.class.getName()).log(Level.SEVERE,
-                        null, ex);
-            }
-        }
-        
-        private void receiveMessage() throws IOException{
-            try {
+                if((playerO != null && playerO.socket.isClosed())
+                   || (playerX != null && playerX.socket.isClosed())){
+                    System.out.println("Retornamos porque los sockets estan cerrados");
+                    return;
+                }
                 int code = this.dis.readInt();
                 MessageType type = MessageType.values()[code];
                 switch(type){
@@ -321,7 +203,7 @@ public class GameServer {
                                 if(playerX != null && !playerX.hasClosedConnection){
                                     playerX.sendGameStatus(gameStatus);
                                 }
-                                playerO.closeConnection();
+                                //playerO.closeConnection();
                                 playerO.hasClosedConnection = true;
                                 System.out.println("playerO.hasClosedConnection = " + playerO.hasClosedConnection);
                             } else {
@@ -332,7 +214,7 @@ public class GameServer {
                                     playerO.sendGameStatus(gameStatus);                                    
                                 }
                                 System.out.println("");
-                                playerX.closeConnection();
+                                //playerX.closeConnection();
                                 playerX.hasClosedConnection = true;
                                 System.out.println("playerX.hasClosedConnection = " + playerX.hasClosedConnection);
                             }

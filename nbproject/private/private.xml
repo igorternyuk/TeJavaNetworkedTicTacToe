@@ -3,9 +3,8 @@
     <editor-bookmarks xmlns="http://www.netbeans.org/ns/editor-bookmarks/2" lastBookmarkId="0"/>
     <open-files xmlns="http://www.netbeans.org/ns/projectui-open-files/2">
         <group>
-            <file>file:/home/igor/prj/java/TeJavaNetworkedTicTacToe/NetworkedTicTacToe/src/networkedtictactoe/GameStatus.java</file>
-            <file>file:/home/igor/prj/java/TeJavaNetworkedTicTacToe/NetworkedTicTacToe/src/networkedtictactoe/GameServer.java</file>
-            <file>file:/home/igor/prj/java/TeJavaNetworkedTicTacToe/NetworkedTicTacToe/src/networkedtictactoe/Player.java</file>
+            <file>file:/home/igor/prj/java/TeJavaNetworkedTicTacToe/NetworkedTicTacToe/src/networkedtictactoe/gameserver/GameServer.java</file>
+            <file>file:/home/igor/prj/java/TeJavaNetworkedTicTacToe/NetworkedTicTacToe/src/networkedtictactoe/client/Player.java</file>
         </group>
     </open-files>
 </project-private>
