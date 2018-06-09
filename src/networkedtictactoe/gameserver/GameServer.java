@@ -1,8 +1,6 @@
 package networkedtictactoe.gameserver;
 
 import java.awt.Point;
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
@@ -11,6 +9,7 @@ import java.net.Socket;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import networkedtictactoe.Board;
+import networkedtictactoe.GameResult;
 import networkedtictactoe.GameStatus;
 import networkedtictactoe.MessageType;
 import networkedtictactoe.PlayerType;
@@ -25,7 +24,7 @@ public class GameServer {
     private Board board;
     private int numPlayers = 0;
     private Point movePlayerO, movePlayerX;
-    private GameStatus gameStatus;
+    private GameStatus gameStatus = GameStatus.WAINTING_FOR_OPPONENT;
     
     private int port;
     private ServerSocket serverSocket;
@@ -79,6 +78,23 @@ public class GameServer {
         }
     }
     
+    private void checkGameStatus(){
+        GameResult result = this.board.checkGameResult();
+        switch(result){
+            case CIRCLES_WON:
+                gameStatus = GameStatus.O_WON;
+                break;
+            case CROSSES_WON:
+                gameStatus = GameStatus.X_WON;
+                break;
+            case TIE:
+                gameStatus = GameStatus.TIE;
+                break;
+            case PLAYING:
+                break;                     
+        }
+    }
+    
     private class ServerSideConnection implements Runnable {
         private Socket socket;
         private int playerId;
@@ -107,16 +123,13 @@ public class GameServer {
 
         @Override
         public void run() {
-            System.out.println("Starting ServerSideConnection thread for player #" + playerId);
+            System.out.println("Starting ServerSideConnection thread for "
+                    + "player #" + playerId);
             try {
                 sendPlayerType();
                 sendBoard(board);
                 while(!gameStatus.isGameOver()){
-                    board.checkGameStatus(gameStatus);
-                    /*if(gameStatus.isGameOver()){
-                        System.out.println("---GAME OVER---");
-                        break;
-                    }*/
+                    checkGameStatus();
                     receiveMessage();
                 }
                 System.out.println("---GAME OVER---");
@@ -127,18 +140,8 @@ public class GameServer {
             } finally {
                 closeConnection();
             }
-            
-            //playerO.closeConnection();
-            //playerX.closeConnection();
         }
         
-        private void sendPlayerType() throws IOException{
-            this.oos.writeObject(MessageType.PLAYER_TYPE);
-            this.oos.writeObject(this.playerType);
-            this.oos.flush();
-            System.out.println("Sending playerType from server "
-                    + this.playerType);
-        }
         
         private void receiveMessage() throws IOException{
             try {
@@ -178,7 +181,7 @@ public class GameServer {
                             
                         }
                         board.print();
-                        board.checkGameStatus(gameStatus);
+                        checkGameStatus();
                         
                         if(gameStatus.isGameOver()){
                             sendSpotCoordinates();
@@ -239,6 +242,14 @@ public class GameServer {
             }
         }
         
+        private void sendPlayerType() throws IOException{
+            this.oos.writeObject(MessageType.PLAYER_TYPE);
+            this.oos.writeObject(this.playerType);
+            this.oos.flush();
+            System.out.println("Sending playerType from server "
+                    + this.playerType);
+        }
+        
         private void sendMoveAccepted() throws IOException{
             try {
                 this.oos.writeObject(MessageType.MOVE_ACCEPTED);
@@ -265,12 +276,16 @@ public class GameServer {
             }
         }
         
-        private void sendBoard(Board board){
+        private void sendBoard(Board b){
             try {
                 System.out.println("Sending board from server to player "
                         + playerType.getMoveSign());
                 this.oos.writeObject(MessageType.BOARD);
-                this.oos.writeObject(board);
+                Board brd = new Board(b);
+                System.out.println("brd:");
+                brd.print();
+                this.oos.writeObject(brd);
+                this.oos.flush();
             } catch (IOException ex) {
                 Logger.getLogger(GameServer.class.getName()).log(Level.SEVERE,
                         null, ex);
@@ -281,7 +296,7 @@ public class GameServer {
             System.out.println("Sending game status " + status);
             try {
                 this.oos.writeObject(MessageType.GAME_STATUS);
-                this.oos.writeObject(status.ordinal());
+                this.oos.writeObject(status);
                 this.oos.flush();
             } catch (IOException ex) {
                 Logger.getLogger(GameServer.class.getName()).log(Level.SEVERE,

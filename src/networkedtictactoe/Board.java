@@ -11,22 +11,30 @@ public class Board implements Serializable{
     private static final int DEFAULT_BOARD_SIZE = 3;
     private int boardSize;
     private String[][] board;
-    Point firstSpot, secondSpot; 
+    private Point firstSpot, secondSpot;
+    private GameResult result = GameResult.PLAYING;
     
     public Board(){
-        this(DEFAULT_BOARD_SIZE);
-        this.firstSpot = new Point(-1,-1);
-        this.secondSpot = new Point(-1,-1);
+        this(DEFAULT_BOARD_SIZE);        
     }
     
     public Board(int size){
+        this.boardSize = size;
         this.board = new String[size][size];
         for(int i = 0; i < boardSize; ++i){
             for(int j = 0; j < boardSize; ++j){
                 this.board[i][j] = " ";
             }
         }
-        this.boardSize = size;
+        this.firstSpot = new Point(-1,-1);
+        this.secondSpot = new Point(-1,-1);
+    }
+    
+    public Board(Board other){
+        this.boardSize = other.boardSize;
+        this.board = (String[][])other.board.clone();
+        this.firstSpot = (Point)other.firstSpot.clone();
+        this.secondSpot = (Point)other.secondSpot.clone();
     }
 
     public int getBoardSize() {
@@ -39,6 +47,10 @@ public class Board implements Serializable{
 
     public Point getSecondSpot() {
         return secondSpot;
+    }
+
+    public GameResult getResult() {
+        return result;
     }
     
     public String valueAt(int x, int y){
@@ -57,12 +69,6 @@ public class Board implements Serializable{
             return true;
         }
         return false;
-    }
-    
-    private void makeMove(int move, PlayerType type){
-        int y = move / boardSize;
-        int x = move % boardSize;
-        makeMove(x, y, type);
     }
     
     private void makeMove(Point move, PlayerType type){
@@ -87,54 +93,56 @@ public class Board implements Serializable{
         return count;
     }
     
-    public void checkGameStatus(GameStatus gameStatus){
+    public GameResult checkGameResult(){
         System.out.println("Checking game status");
         //Check rows
         outer:
         for(int i = 0; i < boardSize; ++i){
             String first = board[i][0];
-            if(first.isEmpty()) continue;
+            if(first.equals(" ")) continue;
             for(int j = 1; j < boardSize; ++j){
                 if(!board[i][j].equalsIgnoreCase(first))
                     continue outer;
             }
             if(first.equalsIgnoreCase(PlayerType.Cross.getMoveSign())){
-                gameStatus = GameStatus.X_WON;
+                result = GameResult.CROSSES_WON;
+                System.out.println("Player X won!!!");
             } else if(first.equalsIgnoreCase(PlayerType.Circle.getMoveSign())){
-                gameStatus = GameStatus.O_WON;
+                result = GameResult.CIRCLES_WON;
+                System.out.println("Player O won!!!");
             }
             this.firstSpot.x = 0;
             this.firstSpot.y = i;
             this.secondSpot.x = boardSize - 1;
             this.secondSpot.y = this.firstSpot.y;
-            return;
+            return result;
         }
         
         //Check columns
         outer:
         for(int j = 0; j < this.boardSize; ++j){
             String first = board[0][j];
-            if(first.isEmpty()) continue;
+            if(first.equals(" ")) continue;
             for(int i = 1; i < this.boardSize; ++i){
                 if(!board[i][j].equalsIgnoreCase(first))
                     continue outer;
             }
             if(first.equalsIgnoreCase(PlayerType.Cross.getMoveSign())){
-                gameStatus = GameStatus.X_WON;
+                result = GameResult.CROSSES_WON;
             } else if(first.equalsIgnoreCase(PlayerType.Circle.getMoveSign())){
-                gameStatus = GameStatus.O_WON;
+                result = GameResult.CIRCLES_WON;
             }
             this.firstSpot.x = j;
             this.firstSpot.y = 0;
             this.secondSpot.x = this.firstSpot.x;
             this.secondSpot.y = this.boardSize - 1;
-            return;
+            return result;
         }
         
         //Check main diagonal
         String first = board[0][0];
         boolean isMainDiagonalFilled = true;
-        if(first.isEmpty()){
+        if(first.equals(" ")){
             isMainDiagonalFilled = false;
         } else {
             for(int i = 1; i < this.boardSize; ++i){
@@ -148,21 +156,21 @@ public class Board implements Serializable{
         
         if(isMainDiagonalFilled){
             if(first.equalsIgnoreCase(PlayerType.Cross.getMoveSign())){
-                gameStatus = GameStatus.X_WON;
+                result = GameResult.CROSSES_WON;
             } else if(first.equalsIgnoreCase(PlayerType.Circle.getMoveSign())){
-                gameStatus = GameStatus.O_WON;
+                result = GameResult.CIRCLES_WON;
             }
             this.firstSpot.x = 0;
             this.firstSpot.y = 0;
             this.secondSpot.x = this.boardSize - 1;
             this.secondSpot.y = this.boardSize - 1;
-            return;
+            return result;
         }
         
         //Check secondary diagonal
         boolean isSecondaryDiagonalFilled = true;
         first = board[0][this.boardSize - 1];
-        if(first.isEmpty()){
+        if(first.equals(" ")){
             isSecondaryDiagonalFilled = false;
         } else {
             for(int i = 1; i < this.boardSize; ++i){
@@ -175,24 +183,26 @@ public class Board implements Serializable{
         
         if(isSecondaryDiagonalFilled){
             if(first.equalsIgnoreCase(PlayerType.Cross.getMoveSign())){
-                gameStatus = GameStatus.X_WON;
+                result = GameResult.CROSSES_WON;
             } else if(first.equalsIgnoreCase(PlayerType.Circle.getMoveSign())){
-                gameStatus = GameStatus.O_WON;
+                result = GameResult.CIRCLES_WON;
             }
             this.firstSpot.x = this.boardSize - 1;
             this.firstSpot.y = 0;
             this.secondSpot.x = 0;
             this.secondSpot.y = this.boardSize - 1;
-            return;
+            return result;
         }
-        if(countFreeSpots() == 0)
-            gameStatus = GameStatus.TIE;
+        if(countFreeSpots() == 0){
+            result = GameResult.TIE;
+        }
+        return result;
     }
     
     public void print(){
         System.out.println("------");
-        for(int i = 0; i < board.length; ++i){
-            for(int j = 0; j < board[i].length; ++j){
+        for(int i = 0; i < boardSize; ++i){
+            for(int j = 0; j < boardSize; ++j){
                 System.out.print(board[i][j] + "|");
             }
             System.out.println("\n------");

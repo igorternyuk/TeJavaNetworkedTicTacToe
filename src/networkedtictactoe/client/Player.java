@@ -53,7 +53,7 @@ public class Player {
     private JTextField textFieldHost;
     private JTextField textFieldPort;
     private JButton btnConnectToServer;
-    private Board board = null;
+    private Board board = new Board();
     private boolean isCircle = false;
     private PlayerType type = PlayerType.Circle;
     private Point opponentMove = null;
@@ -271,7 +271,7 @@ public class Player {
         private void receiveMove() throws IOException, ClassNotFoundException{
             System.out.println("Receiving of the opponent move");
             opponentMove = (Point)this.ois.readObject();
-            
+            board.tryToMove(opponentMove, type.getOpponent());
             System.out.println("Client side connection of player "
                         + type.getMoveSign());
             System.out.println("Received opponent move = " + opponentMove);
@@ -285,7 +285,9 @@ public class Player {
         }
         
         private void receiveBoard() throws IOException, ClassNotFoundException{
-            board = (Board)this.ois.readObject();
+            Board fromServer = (Board)this.ois.readObject();
+            fromServer.print();
+            //board = new Board(fromServer);
             System.out.println("The board received from server:");
             if(board != null){
                 board.print();
@@ -411,6 +413,7 @@ public class Player {
         
         private void drawBoard(Graphics g){
             g.drawImage(imgBoard, 0, 0, null);
+            if(board == null) return;
             for(int i = 0; i < board.getBoardSize(); ++i){
                 for(int j = 0; j < board.getBoardSize(); ++j){
                     if(PlayerType.Cross.getMoveSign()
@@ -456,17 +459,17 @@ public class Player {
                 case X_WON:
                     drawBoard(g);
                     drawWinningLine(g, Color.green.darker().darker());
-                    if(isCircle)
+                    if(type.equals(PlayerType.Circle))
                         drawText(g, YOU_LOST_TEXT, fontLarge, colorYouLost);
-                    else
+                    else if(type.equals(PlayerType.Cross))
                         drawText(g, YOU_WON_TEXT, fontLarge, colorYouWon);
                     break;
                 case O_WON:
                     drawBoard(g);
                     drawWinningLine(g, Color.green.darker().darker());
-                    if(isCircle)
+                    if(type.equals(PlayerType.Circle))
                         drawText(g, YOU_WON_TEXT, fontLarge, colorYouWon);
-                    else
+                    else if(type.equals(PlayerType.Cross))
                         drawText(g, YOU_LOST_TEXT, fontLarge, colorYouLost);
                     break;
                 case TIE: 
@@ -503,6 +506,7 @@ public class Player {
                 System.out.println("sended move = " + move);
                 try {
                     clientSideConnection.sendMove(move);
+                    board.tryToMove(move, type);
                 } catch (IOException ex) {
                     Logger.getLogger(Player.class.getName())
                             .log(Level.SEVERE, null, ex);

@@ -7,8 +7,18 @@ import java.io.Serializable;
  * @author igor
  */
 public enum PlayerType implements Serializable{
-    Circle("O"),
-    Cross("X");
+    Circle("O") {
+        @Override
+        public PlayerType getOpponent() {
+            return Cross;
+        }
+    },
+    Cross("X") {
+        @Override
+        public PlayerType getOpponent() {
+            return Circle;
+        }
+    };
     
     private String moveSign;
 
@@ -19,4 +29,6 @@ public enum PlayerType implements Serializable{
     public String getMoveSign() {
         return moveSign;
     }
+    
+    public abstract PlayerType getOpponent();
 }
