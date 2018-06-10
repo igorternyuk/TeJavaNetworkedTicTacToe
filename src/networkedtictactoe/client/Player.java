@@ -117,7 +117,7 @@ public class Player {
                 if(reply == JOptionPane.YES_OPTION){
                     if(clientSideConnection != null){
                         if(!clientSideConnection.socket.isClosed()){
-                            //clientSideConnection.sendCloseConenction();
+                            clientSideConnection.sendCloseConenction();
                             clientSideConnection.closeConnection();
                         }
                     }
@@ -207,7 +207,7 @@ public class Player {
                        receivePlayerType();
                         break;
                     //Opponent connected
-                    case OPPONENT_READINESS:
+                    case OPPONENT_CONNECTED:
                         receiveOpponentReadiness();
                         break;
                         
@@ -227,11 +227,6 @@ public class Player {
                     //Game status
                     case GAME_STATUS:
                         receiveGameStatus();
-                        break;
-                        
-                    //First and second spots
-                    case WINNIG_LINE_SPOTS:
-                        receiveSpotCoordinates();
                         break;
                                               
                     case DISCONNECTION:
@@ -268,16 +263,6 @@ public class Player {
             }
         }
         
-        /*private void receiveMove() throws IOException, ClassNotFoundException{
-            System.out.println("Receiving of the opponent move");
-            opponentMove = (Point)this.ois.readObject();
-            //board.tryToMove(opponentMove, type.getOpponent());
-            System.out.println("Client side connection of player "
-                        + type.getMoveSign());
-            System.out.println("Received opponent move = " + opponentMove);
-
-        }*/
-        
         private boolean receiveMoveAccepted() throws IOException{
             boolean moveAccepted = this.ois.readBoolean();
             System.out.println("Received moveAccepted " + moveAccepted);
@@ -286,7 +271,7 @@ public class Player {
         
         private void receiveBoard() throws IOException, ClassNotFoundException{
             Board fromServer = (Board)this.ois.readObject();
-            System.out.println("The board received from server:");
+            System.out.println("The board received from the server:");
             fromServer.print();
             board = fromServer;
             System.out.println("Our board:");
@@ -299,23 +284,16 @@ public class Player {
         private void receiveGameStatus() throws IOException, ClassNotFoundException {
             System.out.println("Receiving the new game status");
             gameStatus = (GameStatus)this.ois.readObject();
-            lblGameStatus.setText(gameStatus.getDescription());
-            canvas.repaint();
-        }
-        
-        public void receiveSpotCoordinates() throws IOException, ClassNotFoundException{
-            try {
-                firstSpot = (Point)this.ois.readObject();
-                secondSpot = (Point)this.ois.readObject();
+            if(gameStatus.isGameOver()){
+                firstSpot = board.getFirstSpot();
+                secondSpot = board.getSecondSpot();
                 firstSpot.x = firstSpot.x * (SPOT_SIZE + SPOT_GAP) + SPOT_SIZE / 2;
                 firstSpot.y = firstSpot.y * (SPOT_SIZE + SPOT_GAP) + SPOT_SIZE / 2;
                 secondSpot.x = secondSpot.x * (SPOT_SIZE + SPOT_GAP) + SPOT_SIZE / 2;
                 secondSpot.y = secondSpot.y * (SPOT_SIZE + SPOT_GAP) + SPOT_SIZE / 2;
-            } catch (IOException ex) {
-                Logger.getLogger(Player.class.getName()).log(Level.SEVERE,
-                        null, ex);
-                throw ex;
             }
+            lblGameStatus.setText(gameStatus.getDescription());
+            canvas.repaint();
         }
         
         private void closeConnection(){

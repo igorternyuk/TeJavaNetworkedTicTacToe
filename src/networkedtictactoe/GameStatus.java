@@ -49,6 +49,7 @@ public enum GameStatus implements Serializable{
             return true;
         }
     };
+    
     private String text;
 
     private GameStatus(String text) {

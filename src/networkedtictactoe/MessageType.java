@@ -8,12 +8,10 @@ import java.io.Serializable;
  */
 public enum MessageType implements Serializable{
     PLAYER_TYPE,
-    OPPONENT_READINESS,
+    OPPONENT_CONNECTED,
     MOVE,
     MOVE_ACCEPTED,
     BOARD,
     GAME_STATUS,
-    WINNIG_LINE_SPOTS,
-    DISCONNECTION,
-    SBOARD
+    DISCONNECTION
 }
